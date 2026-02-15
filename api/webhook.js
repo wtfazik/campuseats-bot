@@ -1,249 +1,279 @@
 import { Telegraf, Markup } from "telegraf";
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-const SUPPORT_CHAT_ID = -1003714441392;
 
+// 👉 ID вашей группы (бот админ)
+const SUPPORT_GROUP_ID = -1003714441392;
+
+// Простое хранилище (для Vercel достаточно)
 const users = {};
-const awaitingReview = new Set();
-const awaitingPhone = new Set();
 
-/* ================= TEXTS ================= */
+/* ===========================
+   🌍 Тексты
+=========================== */
 
 const texts = {
   ru: {
-    welcome:
-      "👋 Здравствуйте!\n\nДобро пожаловать в *CampusEats* 🍽\n\nМы — современный сервис доставки еды.\n\n🎓 Студенты получают бонусы.\n\nВыберите действие ниже 👇",
-    balance: "💰 Ваш баланс: 0 UZS",
-    orders: "📦 История заказов будет доступна позже.",
-    about:
-      "ℹ *О нас*\n\nCampusEats — сервис доставки еды.\n\nНаша цель — быстро и удобно доставлять еду.",
-    help:
-      "🆘 *Помощь*\n\n1️⃣ Нажмите Order\n2️⃣ Выберите ресторан\n3️⃣ Оформите заказ\n\nSupport: @CampusEats",
-    reviewAsk: "✍ Напишите ваш отзыв одним сообщением:",
-    reviewThanks:
-      "✅ Спасибо за отзыв!\n\nВаше мнение помогает нам становиться лучше 🚀",
-    settings: "⚙ Настройки",
-    chooseLang: "🌍 Выберите язык:",
-    chooseCity: "🏙 Выберите город:",
-    enterPhone: "📱 Введите номер телефона (+998...)",
-    back: "⬅ Назад"
-  },
+    welcome: `👋 Здравствуйте!
 
-  uz: {
-    welcome:
-      "👋 Salom!\n\n*CampusEats* ga xush kelibsiz 🍽\n\nBiz — zamonaviy ovqat yetkazib berish xizmati.\n\n🎓 Talabalar bonus oladi.\n\nQuyidan tanlang 👇",
-    balance: "💰 Balansingiz: 0 UZS",
-    orders: "📦 Buyurtmalar tarixi keyinroq mavjud bo‘ladi.",
-    about:
-      "ℹ *Biz haqimizda*\n\nCampusEats — ovqat yetkazib berish xizmati.",
-    help:
-      "🆘 *Yordam*\n\n1️⃣ Order ni bosing\n2️⃣ Restoranni tanlang\n3️⃣ Buyurtma bering\n\nSupport: @CampusEats",
-    reviewAsk: "✍ Fikringizni bitta xabarda yozing:",
-    reviewThanks:
-      "✅ Fikringiz uchun rahmat!\n\nBu bizni yaxshiroq qiladi 🚀",
-    settings: "⚙ Sozlamalar",
-    chooseLang: "🌍 Tilni tanlang:",
-    chooseCity: "🏙 Shaharni tanlang:",
-    enterPhone: "📱 Telefon raqam kiriting (+998...)",
-    back: "⬅ Orqaga"
+Добро пожаловать в CampusEats 🍽
+
+Мы — современный сервис доставки еды.
+
+🎓 Студенты получают бонусы.
+🍔 Любой пользователь может заказать еду быстро и удобно.
+
+Выберите действие ниже 👇`,
+
+    help: `🆘 Помощь
+
+1️⃣ Нажмите Order  
+2️⃣ Выберите ресторан  
+3️⃣ Оформите заказ  
+
+Если возникнут вопросы — напишите в поддержку:
+📩 @CampusEats`,
+
+    about: `ℹ️ О нас
+
+CampusEats — современная платформа доставки еды.
+
+Наша цель — сделать заказ быстрым,
+удобным и понятным для каждого пользователя.`,
+
+    balance: `💰 Ваш баланс: 0 UZS`,
+    orders: `📦 История заказов появится после запуска полной версии сервиса.`,
+    reviewAsk: `✍️ Напишите ваш отзыв одним сообщением.`,
+    reviewThanks: `🙏 Спасибо за ваш отзыв!
+
+Ваше мнение помогает нам становиться лучше.
+Мы ценим каждого пользователя 💛`,
+
+    settings: `⚙️ Настройки`,
+    chooseLang: `🌍 Выберите язык:`,
   },
 
   en: {
-    welcome:
-      "👋 Hello!\n\nWelcome to *CampusEats* 🍽\n\nWe are a modern food delivery service.\n\n🎓 Students receive bonuses.\n\nChoose below 👇",
-    balance: "💰 Your balance: 0 UZS",
-    orders: "📦 Order history will be available soon.",
-    about:
-      "ℹ *About us*\n\nCampusEats — food delivery service.",
-    help:
-      "🆘 *Help*\n\n1️⃣ Press Order\n2️⃣ Choose restaurant\n3️⃣ Place order\n\nSupport: @CampusEats",
-    reviewAsk: "✍ Send your review in one message:",
-    reviewThanks:
-      "✅ Thank you for your feedback!\n\nIt helps us improve 🚀",
-    settings: "⚙ Settings",
-    chooseLang: "🌍 Choose language:",
-    chooseCity: "🏙 Choose city:",
-    enterPhone: "📱 Enter phone (+998...)",
-    back: "⬅ Back"
+    welcome: `👋 Hello!
+
+Welcome to CampusEats 🍽
+
+We are a modern food delivery service.
+
+🎓 Students receive bonuses.
+🍔 Anyone can order food quickly and easily.
+
+Choose an option below 👇`,
+
+    help: `🆘 Help
+
+1️⃣ Click Order  
+2️⃣ Choose a restaurant  
+3️⃣ Place your order  
+
+Need support?
+📩 @CampusEats`,
+
+    about: `ℹ️ About Us
+
+CampusEats is a modern food delivery platform.
+
+Our mission is to make ordering food
+simple and convenient.`,
+
+    balance: `💰 Your balance: 0 UZS`,
+    orders: `📦 Order history will be available soon.`,
+    reviewAsk: `✍️ Please send your review in one message.`,
+    reviewThanks: `🙏 Thank you for your review!
+
+Your feedback helps us improve 💛`,
+
+    settings: `⚙️ Settings`,
+    chooseLang: `🌍 Choose language:`,
   }
 };
 
-function t(userId) {
-  const lang = users[userId]?.lang || "ru";
-  return texts[lang];
-}
+/* ===========================
+   📌 Главное меню
+=========================== */
 
-/* ================= MENU ================= */
-
-function mainMenu() {
+function mainMenu(lang = "ru") {
   return Markup.inlineKeyboard([
+    [Markup.button.callback("📦 Order", "order")],
     [Markup.button.callback("📦 Мои заказы", "orders")],
     [Markup.button.callback("💰 Balance", "balance")],
     [Markup.button.callback("⭐ Оставить отзыв", "review")],
-    [Markup.button.callback("ℹ О нас", "about")],
-    [Markup.button.callback("⚙ Настройки", "settings")],
+    [Markup.button.callback("ℹ️ О нас", "about")],
+    [Markup.button.callback("⚙️ Настройки", "settings")],
     [Markup.button.callback("🆘 Помощь", "help")]
   ]);
 }
 
-/* ================= UTIL ================= */
-
-async function safeEdit(ctx, text, extra = {}) {
-  try {
-    await ctx.editMessageText(text, {
-      parse_mode: "Markdown",
-      ...extra
-    });
-  } catch {
-    await ctx.reply(text, { parse_mode: "Markdown", ...extra });
-  }
-}
-
-/* ================= COMMANDS ================= */
+/* ===========================
+   🚀 START
+=========================== */
 
 bot.start(async (ctx) => {
   const id = ctx.from.id;
-  if (!users[id]) users[id] = { lang: "ru" };
 
-  await ctx.reply(t(id).welcome, {
-    parse_mode: "Markdown",
-    ...mainMenu()
-  });
+  if (!users[id]) {
+    users[id] = {
+      lang: "ru",
+      username: ctx.from.username || "не указан",
+      name: ctx.from.first_name || "",
+      phone: null,
+      reviewMode: false
+    };
+  }
+
+  const lang = users[id].lang;
+
+  await ctx.reply(texts[lang].welcome, mainMenu(lang));
 });
 
-bot.command("menu", async (ctx) => {
-  const id = ctx.from.id;
-  await ctx.reply(t(id).welcome, {
-    parse_mode: "Markdown",
-    ...mainMenu()
-  });
-});
+/* ===========================
+   📦 Order
+=========================== */
 
-/* ================= CALLBACKS ================= */
-
-bot.action("balance", async (ctx) => {
+bot.action("order", async (ctx) => {
   await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).balance, mainMenu());
+  await ctx.reply("🚀 Раздел заказов скоро будет доступен.");
 });
+
+/* ===========================
+   📦 Orders
+=========================== */
 
 bot.action("orders", async (ctx) => {
   await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).orders, mainMenu());
+  const lang = users[ctx.from.id]?.lang || "ru";
+  await ctx.reply(texts[lang].orders);
 });
+
+/* ===========================
+   💰 Balance
+=========================== */
+
+bot.action("balance", async (ctx) => {
+  await ctx.answerCbQuery();
+  const lang = users[ctx.from.id]?.lang || "ru";
+  await ctx.reply(texts[lang].balance);
+});
+
+/* ===========================
+   ℹ️ About
+=========================== */
 
 bot.action("about", async (ctx) => {
   await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).about, mainMenu());
+  const lang = users[ctx.from.id]?.lang || "ru";
+  await ctx.reply(texts[lang].about);
 });
+
+/* ===========================
+   🆘 Help
+=========================== */
 
 bot.action("help", async (ctx) => {
   await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).help, mainMenu());
+  const lang = users[ctx.from.id]?.lang || "ru";
+  await ctx.reply(texts[lang].help);
 });
+
+/* ===========================
+   ⭐ Review
+=========================== */
 
 bot.action("review", async (ctx) => {
-  awaitingReview.add(ctx.from.id);
   await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).reviewAsk);
+  const id = ctx.from.id;
+  const lang = users[id]?.lang || "ru";
+
+  users[id].reviewMode = true;
+
+  await ctx.reply(texts[lang].reviewAsk);
 });
-
-/* ================= SETTINGS ================= */
-
-bot.action("settings", async (ctx) => {
-  await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).settings, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "🌍 Язык", callback_data: "lang" }],
-        [{ text: "📱 Телефон", callback_data: "phone" }],
-        [{ text: "⬅ Назад", callback_data: "back" }]
-      ]
-    }
-  });
-});
-
-bot.action("lang", async (ctx) => {
-  await ctx.answerCbQuery();
-  await safeEdit(ctx, t(ctx.from.id).chooseLang, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "Русский 🇷🇺", callback_data: "set_ru" }],
-        [{ text: "O'zbek 🇺🇿", callback_data: "set_uz" }],
-        [{ text: "English 🇬🇧", callback_data: "set_en" }],
-        [{ text: t(ctx.from.id).back, callback_data: "back" }]
-      ]
-    }
-  });
-});
-
-bot.action(/set_(.+)/, async (ctx) => {
-  const lang = ctx.match[1];
-  users[ctx.from.id].lang = lang;
-  await ctx.answerCbQuery("Language updated");
-  await ctx.reply(t(ctx.from.id).welcome, {
-    parse_mode: "Markdown",
-    ...mainMenu()
-  });
-});
-
-bot.action("phone", async (ctx) => {
-  awaitingPhone.add(ctx.from.id);
-  await ctx.answerCbQuery();
-  await ctx.reply(t(ctx.from.id).enterPhone);
-});
-
-bot.action("back", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.reply(t(ctx.from.id).welcome, {
-    parse_mode: "Markdown",
-    ...mainMenu()
-  });
-});
-
-/* ================= TEXT HANDLER ================= */
 
 bot.on("text", async (ctx) => {
   const id = ctx.from.id;
+  const user = users[id];
 
-  /* Review */
-  if (awaitingReview.has(id)) {
-    awaitingReview.delete(id);
+  if (!user || !user.reviewMode) return;
 
-    const reviewText = ctx.message.text;
+  const reviewText = ctx.message.text;
 
-    await bot.telegram.sendMessage(
-      SUPPORT_CHAT_ID,
-      `📝 Новый отзыв\n\n👤 ${ctx.from.first_name}\n🆔 ${id}\n\n${reviewText}`
-    );
+  user.reviewMode = false;
 
-    await ctx.reply(t(id).reviewThanks);
-    return;
-  }
+  const username = user.username ? `@${user.username}` : "не указан";
+  const phone = user.phone || "не указан";
 
-  /* Phone */
-  if (awaitingPhone.has(id)) {
-    if (!ctx.message.text.startsWith("+998")) {
-      await ctx.reply("Введите номер в формате +998...");
-      return;
-    }
-    awaitingPhone.delete(id);
-    users[id].phone = ctx.message.text;
-    await ctx.reply("✅ Номер сохранён");
-  }
+  await bot.telegram.sendMessage(
+    SUPPORT_GROUP_ID,
+    `📩 Новый отзыв
+
+👤 Имя: ${user.name}
+🔗 Username: ${username}
+📞 Телефон: ${phone}
+
+📝 Отзыв:
+${reviewText}`
+  );
+
+  const lang = user.lang || "ru";
+
+  await ctx.reply(texts[lang].reviewThanks);
 });
 
-/* ================= VERCEL HANDLER ================= */
+/* ===========================
+   ⚙️ Settings
+=========================== */
+
+bot.action("settings", async (ctx) => {
+  await ctx.answerCbQuery();
+
+  const lang = users[ctx.from.id]?.lang || "ru";
+
+  await ctx.reply(
+    texts[lang].chooseLang,
+    Markup.inlineKeyboard([
+      [
+        Markup.button.callback("🇷🇺 Русский", "lang_ru"),
+        Markup.button.callback("🇬🇧 English", "lang_en")
+      ]
+    ])
+  );
+});
+
+/* ===========================
+   🌍 Language
+=========================== */
+
+bot.action("lang_ru", async (ctx) => {
+  users[ctx.from.id].lang = "ru";
+  await ctx.answerCbQuery("Язык изменен");
+  await ctx.reply(texts.ru.welcome, mainMenu("ru"));
+});
+
+bot.action("lang_en", async (ctx) => {
+  users[ctx.from.id].lang = "en";
+  await ctx.answerCbQuery("Language updated");
+  await ctx.reply(texts.en.welcome, mainMenu("en"));
+});
+
+/* ===========================
+   🌐 Webhook
+=========================== */
 
 export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
       await bot.handleUpdate(req.body);
-      res.status(200).json({ ok: true });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Bot error" });
+      res.status(200).end();
+    } catch (error) {
+      console.error(error);
+      res.status(500).end();
     }
   } else {
-    res.status(200).send("Bot running");
+    res.status(200).send("Bot is running");
   }
 }
