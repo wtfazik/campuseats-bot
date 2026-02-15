@@ -2,17 +2,16 @@ const { Telegraf, Markup } = require("telegraf");
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-// ====== CONFIG ======
 const WEBAPP_URL = "https://test-version-omega.vercel.app/";
-const SUPPORT_CHAT_ID = "-1003714441392"; // ваша группа
-// =====================
+const SUPPORT_CHAT_ID = "-1003714441392";
 
 const userState = {};
+const userData = {};
 
-// ====== ГЛАВНОЕ МЕНЮ ======
+// ===== ГЛАВНОЕ МЕНЮ =====
 function mainMenu() {
   return Markup.inlineKeyboard([
-    [Markup.button.webApp("🍽 Меню ресторанов", WEBAPP_URL)],
+    [Markup.button.webApp("🍽 Order", WEBAPP_URL)],
     [
       Markup.button.callback("📦 Мои заказы", "orders"),
       Markup.button.callback("💰 Баланс", "balance"),
@@ -24,8 +23,10 @@ function mainMenu() {
   ]);
 }
 
-// ====== /start ======
+// ===== /start =====
 bot.start(async (ctx) => {
+  userState[ctx.from.id] = null;
+
   await ctx.reply(
 `👋 Здравствуйте!
 
@@ -41,7 +42,7 @@ bot.start(async (ctx) => {
   );
 });
 
-// ====== Мои заказы ======
+// ===== CALLBACK ОБРАБОТКА =====
 bot.action("orders", async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.editMessageText(
@@ -49,23 +50,21 @@ bot.action("orders", async (ctx) => {
 
 Здесь будет отображаться ваша история заказов.
 
-Раздел станет доступен после полной интеграции.`,
+Раздел станет доступен немного позже.`,
     mainMenu()
   );
 });
 
-// ====== Баланс ======
 bot.action("balance", async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.editMessageText(
-`💰 Ваш баланс: 0 UZS
+`💰 Баланс: 0 UZS
 
 Бонусная система находится в разработке.`,
     mainMenu()
   );
 });
 
-// ====== О НАС ======
 bot.action("about", async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.editMessageText(
@@ -73,30 +72,25 @@ bot.action("about", async (ctx) => {
 
 CampusEats — сервис доставки еды.
 
-Мы делаем заказ еды быстрым и удобным.
+Поддержка: @CampusEats`,
+    mainMenu()
+  );
+});
+
+bot.action("help", async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+`🆘 Помощь
+
+1️⃣ Нажмите Order
+2️⃣ Выберите ресторан
+3️⃣ Оформите заказ
 
 Поддержка: @CampusEats`,
     mainMenu()
   );
 });
 
-// ====== ПОМОЩЬ ======
-bot.action("help", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(
-`🆘 Помощь
-
-1️⃣ Нажмите «Меню ресторанов»
-2️⃣ Выберите ресторан
-3️⃣ Оформите заказ
-
-Если возникнут вопросы:
-@CampusEats`,
-    mainMenu()
-  );
-});
-
-// ====== НАСТРОЙКИ ======
 bot.action("settings", async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.editMessageText(
@@ -113,22 +107,19 @@ bot.action("settings", async (ctx) => {
 
 bot.action("back", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.editMessageText(
-`Главное меню 👇`,
-    mainMenu()
-  );
+  await ctx.editMessageText("Главное меню 👇", mainMenu());
 });
 
-// ====== ГОРОДА ======
+// ===== ГОРОДА =====
 bot.action("set_city", async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.editMessageText(
 `🏙 Выберите город:`,
     Markup.inlineKeyboard([
-      [Markup.button.callback("Ташкент", "city_tashkent")],
-      [Markup.button.callback("Самарканд", "city_samarkand")],
-      [Markup.button.callback("Бухара", "city_bukhara")],
-      [Markup.button.callback("Андижан", "city_andijan")],
+      [Markup.button.callback("Ташкент", "city_Ташкент")],
+      [Markup.button.callback("Самарканд", "city_Самарканд")],
+      [Markup.button.callback("Бухара", "city_Бухара")],
+      [Markup.button.callback("Андижан", "city_Андижан")],
       [Markup.button.callback("🔙 Назад", "settings")]
     ])
   );
@@ -136,69 +127,80 @@ bot.action("set_city", async (ctx) => {
 
 bot.action(/city_(.+)/, async (ctx) => {
   const city = ctx.match[1];
+
+  if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
+  userData[ctx.from.id].city = city;
+
   await ctx.answerCbQuery();
   await ctx.editMessageText(
-`✅ Город выбран: ${city}`,
+`✅ Город сохранён: ${city}`,
     mainMenu()
   );
 });
 
-// ====== ТЕЛЕФОН ======
+// ===== ТЕЛЕФОН =====
 bot.action("set_phone", async (ctx) => {
   userState[ctx.from.id] = "waiting_phone";
   await ctx.answerCbQuery();
   await ctx.reply("Введите номер телефона (формат: +998XXXXXXXXX)");
 });
 
-bot.on("text", async (ctx) => {
-  if (userState[ctx.from.id] === "waiting_phone") {
-    const phone = ctx.message.text;
-
-    if (!phone.startsWith("+998")) {
-      return ctx.reply("Номер должен начинаться с +998");
-    }
-
-    userState[ctx.from.id] = null;
-    await ctx.reply("✅ Телефон сохранён");
-  }
-});
-
-// ====== ОТЗЫВ ======
+// ===== ОТЗЫВ =====
 bot.action("review", async (ctx) => {
   userState[ctx.from.id] = "waiting_review";
   await ctx.answerCbQuery();
   await ctx.reply("✍️ Напишите ваш отзыв:");
 });
 
+// ===== ЕДИНЫЙ ОБРАБОТЧИК TEXT =====
 bot.on("text", async (ctx) => {
-  if (userState[ctx.from.id] === "waiting_review") {
+  const state = userState[ctx.from.id];
 
-    const reviewText = ctx.message.text;
+  if (state === "waiting_phone") {
+    const phone = ctx.message.text.trim();
+
+    if (!phone.startsWith("+998")) {
+      return ctx.reply("Номер должен начинаться с +998");
+    }
+
+    if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
+    userData[ctx.from.id].phone = phone;
+
+    userState[ctx.from.id] = null;
+
+    return ctx.reply("✅ Телефон сохранён", mainMenu());
+  }
+
+  if (state === "waiting_review") {
+    const reviewText = ctx.message.text.trim();
 
     const username = ctx.from.username
       ? `@${ctx.from.username}`
-      : "Нет username";
+      : "Без username";
 
-    const phone = "Не указан";
+    const phone = userData[ctx.from.id]?.phone || "Не указан";
 
     await ctx.telegram.sendMessage(
       SUPPORT_CHAT_ID,
 `📝 Новый отзыв
 
-👤 Пользователь: ${username}
+👤 Username: ${username}
 📞 Телефон: ${phone}
 
-💬 Сообщение:
+💬 Текст:
 ${reviewText}`
     );
 
     userState[ctx.from.id] = null;
 
-    await ctx.reply("Спасибо за ваш отзыв! Это помогает нам становиться лучше 🙌", mainMenu());
+    return ctx.reply(
+"Спасибо за ваш отзыв! Это помогает нам становиться лучше 🙌",
+      mainMenu()
+    );
   }
 });
 
-// ====== WEBHOOK ======
+// ===== WEBHOOK =====
 module.exports = async (req, res) => {
   try {
     await bot.handleUpdate(req.body);
