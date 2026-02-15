@@ -1,222 +1,249 @@
 import { Telegraf, Markup } from "telegraf";
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-
-/* ================= STORAGE ================= */
+const SUPPORT_CHAT_ID = -1003714441392;
 
 const users = {};
+const awaitingReview = new Set();
+const awaitingPhone = new Set();
 
-/* ================= CITIES ================= */
+/* ================= TEXTS ================= */
 
-const cities = [
-  "Tashkent",
-  "Samarkand",
-  "Bukhara",
-  "Andijan",
-  "Namangan",
-  "Fergana",
-  "Nukus",
-  "Khiva",
-  "Termez",
-  "Karshi",
-  "Jizzakh",
-  "Navoi",
-  "Gulistan"
-];
-
-/* ================= HELPERS ================= */
-
-function getUser(id) {
-  if (!users[id]) {
-    users[id] = {
-      lang: "ru",
-      city: "Tashkent",
-      lastMessageId: null
-    };
-  }
-  return users[id];
-}
-
-async function sendClean(ctx, text, keyboard = null) {
-  const user = getUser(ctx.from.id);
-
-  if (user.lastMessageId) {
-    try {
-      await ctx.telegram.deleteMessage(ctx.chat.id, user.lastMessageId);
-    } catch {}
-  }
-
-  const msg = await ctx.reply(text, keyboard);
-  user.lastMessageId = msg.message_id;
-}
-
-/* ================= TRANSLATIONS ================= */
-
-const text = {
+const texts = {
   ru: {
-    welcome: `👋 Здравствуйте!
-
-Добро пожаловать в CampusEats 🍽
-
-Мы — современный сервис доставки еды.
-
-🎓 Студенты получают бонусы.
-
-Выберите действие ниже 👇`,
-
-    order: "📦 Order",
-    orders: "📦 Мои заказы",
-    balance: "💰 Balance",
-    review: "⭐ Оставить отзыв",
-    about: "ℹ️ О нас",
-    settings: "⚙️ Настройки",
-    help: "🆘 Помощь",
-    back: "⬅️ Назад",
+    welcome:
+      "👋 Здравствуйте!\n\nДобро пожаловать в *CampusEats* 🍽\n\nМы — современный сервис доставки еды.\n\n🎓 Студенты получают бонусы.\n\nВыберите действие ниже 👇",
+    balance: "💰 Ваш баланс: 0 UZS",
+    orders: "📦 История заказов будет доступна позже.",
+    about:
+      "ℹ *О нас*\n\nCampusEats — сервис доставки еды.\n\nНаша цель — быстро и удобно доставлять еду.",
+    help:
+      "🆘 *Помощь*\n\n1️⃣ Нажмите Order\n2️⃣ Выберите ресторан\n3️⃣ Оформите заказ\n\nSupport: @CampusEats",
+    reviewAsk: "✍ Напишите ваш отзыв одним сообщением:",
+    reviewThanks:
+      "✅ Спасибо за отзыв!\n\nВаше мнение помогает нам становиться лучше 🚀",
+    settings: "⚙ Настройки",
     chooseLang: "🌍 Выберите язык:",
     chooseCity: "🏙 Выберите город:",
-    currentCity: (city) => `🏙 Ваш город: ${city}`,
-    helpText: `🆘 Помощь
+    enterPhone: "📱 Введите номер телефона (+998...)",
+    back: "⬅ Назад"
+  },
 
-1️⃣ Нажмите Order
-2️⃣ Выберите ресторан
-3️⃣ Оформите заказ
+  uz: {
+    welcome:
+      "👋 Salom!\n\n*CampusEats* ga xush kelibsiz 🍽\n\nBiz — zamonaviy ovqat yetkazib berish xizmati.\n\n🎓 Talabalar bonus oladi.\n\nQuyidan tanlang 👇",
+    balance: "💰 Balansingiz: 0 UZS",
+    orders: "📦 Buyurtmalar tarixi keyinroq mavjud bo‘ladi.",
+    about:
+      "ℹ *Biz haqimizda*\n\nCampusEats — ovqat yetkazib berish xizmati.",
+    help:
+      "🆘 *Yordam*\n\n1️⃣ Order ni bosing\n2️⃣ Restoranni tanlang\n3️⃣ Buyurtma bering\n\nSupport: @CampusEats",
+    reviewAsk: "✍ Fikringizni bitta xabarda yozing:",
+    reviewThanks:
+      "✅ Fikringiz uchun rahmat!\n\nBu bizni yaxshiroq qiladi 🚀",
+    settings: "⚙ Sozlamalar",
+    chooseLang: "🌍 Tilni tanlang:",
+    chooseCity: "🏙 Shaharni tanlang:",
+    enterPhone: "📱 Telefon raqam kiriting (+998...)",
+    back: "⬅ Orqaga"
+  },
 
-Support: @CampusEats`,
-    aboutText: `ℹ️ О CampusEats
-
-CampusEats — сервис доставки еды.
-Мы делаем заказ быстрым и удобным.`,
-    comingSoon: "🚀 Функция скоро будет доступна."
+  en: {
+    welcome:
+      "👋 Hello!\n\nWelcome to *CampusEats* 🍽\n\nWe are a modern food delivery service.\n\n🎓 Students receive bonuses.\n\nChoose below 👇",
+    balance: "💰 Your balance: 0 UZS",
+    orders: "📦 Order history will be available soon.",
+    about:
+      "ℹ *About us*\n\nCampusEats — food delivery service.",
+    help:
+      "🆘 *Help*\n\n1️⃣ Press Order\n2️⃣ Choose restaurant\n3️⃣ Place order\n\nSupport: @CampusEats",
+    reviewAsk: "✍ Send your review in one message:",
+    reviewThanks:
+      "✅ Thank you for your feedback!\n\nIt helps us improve 🚀",
+    settings: "⚙ Settings",
+    chooseLang: "🌍 Choose language:",
+    chooseCity: "🏙 Choose city:",
+    enterPhone: "📱 Enter phone (+998...)",
+    back: "⬅ Back"
   }
 };
 
-/* ================= MAIN MENU ================= */
+function t(userId) {
+  const lang = users[userId]?.lang || "ru";
+  return texts[lang];
+}
 
-function mainMenu(lang) {
+/* ================= MENU ================= */
+
+function mainMenu() {
   return Markup.inlineKeyboard([
-    [Markup.button.webApp(text[lang].order, "https://test-version-omega.vercel.app/")],
-    [Markup.button.callback(text[lang].orders, "ORDERS")],
-    [Markup.button.callback(text[lang].balance, "BALANCE")],
-    [Markup.button.callback(text[lang].review, "REVIEW")],
-    [Markup.button.callback(text[lang].about, "ABOUT")],
-    [Markup.button.callback(text[lang].settings, "SETTINGS")],
-    [Markup.button.callback(text[lang].help, "HELP")]
+    [Markup.button.callback("📦 Мои заказы", "orders")],
+    [Markup.button.callback("💰 Balance", "balance")],
+    [Markup.button.callback("⭐ Оставить отзыв", "review")],
+    [Markup.button.callback("ℹ О нас", "about")],
+    [Markup.button.callback("⚙ Настройки", "settings")],
+    [Markup.button.callback("🆘 Помощь", "help")]
   ]);
 }
 
-/* ================= START ================= */
+/* ================= UTIL ================= */
+
+async function safeEdit(ctx, text, extra = {}) {
+  try {
+    await ctx.editMessageText(text, {
+      parse_mode: "Markdown",
+      ...extra
+    });
+  } catch {
+    await ctx.reply(text, { parse_mode: "Markdown", ...extra });
+  }
+}
+
+/* ================= COMMANDS ================= */
 
 bot.start(async (ctx) => {
-  const user = getUser(ctx.from.id);
-  await sendClean(ctx, text[user.lang].welcome, mainMenu(user.lang));
+  const id = ctx.from.id;
+  if (!users[id]) users[id] = { lang: "ru" };
+
+  await ctx.reply(t(id).welcome, {
+    parse_mode: "Markdown",
+    ...mainMenu()
+  });
 });
 
-/* ================= /ALL COMMAND ================= */
+bot.command("menu", async (ctx) => {
+  const id = ctx.from.id;
+  await ctx.reply(t(id).welcome, {
+    parse_mode: "Markdown",
+    ...mainMenu()
+  });
+});
 
-bot.command("all", async (ctx) => {
-  const user = getUser(ctx.from.id);
-  await sendClean(ctx, text[user.lang].welcome, mainMenu(user.lang));
+/* ================= CALLBACKS ================= */
+
+bot.action("balance", async (ctx) => {
+  await ctx.answerCbQuery();
+  await safeEdit(ctx, t(ctx.from.id).balance, mainMenu());
+});
+
+bot.action("orders", async (ctx) => {
+  await ctx.answerCbQuery();
+  await safeEdit(ctx, t(ctx.from.id).orders, mainMenu());
+});
+
+bot.action("about", async (ctx) => {
+  await ctx.answerCbQuery();
+  await safeEdit(ctx, t(ctx.from.id).about, mainMenu());
+});
+
+bot.action("help", async (ctx) => {
+  await ctx.answerCbQuery();
+  await safeEdit(ctx, t(ctx.from.id).help, mainMenu());
+});
+
+bot.action("review", async (ctx) => {
+  awaitingReview.add(ctx.from.id);
+  await ctx.answerCbQuery();
+  await safeEdit(ctx, t(ctx.from.id).reviewAsk);
 });
 
 /* ================= SETTINGS ================= */
 
-bot.action("SETTINGS", async (ctx) => {
-  const user = getUser(ctx.from.id);
+bot.action("settings", async (ctx) => {
   await ctx.answerCbQuery();
-
-  await sendClean(
-    ctx,
-    `${text[user.lang].currentCity(user.city)}
-
-${text[user.lang].chooseLang}`,
-    Markup.inlineKeyboard([
-      [Markup.button.callback("Русский 🇷🇺", "LANG_ru")],
-      [Markup.button.callback("O‘zbek 🇺🇿", "LANG_uz")],
-      [Markup.button.callback("English 🇬🇧", "LANG_en")],
-      [Markup.button.callback("🏙 Сменить город", "CITY")],
-      [Markup.button.callback(text[user.lang].back, "BACK")]
-    ])
-  );
+  await safeEdit(ctx, t(ctx.from.id).settings, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🌍 Язык", callback_data: "lang" }],
+        [{ text: "📱 Телефон", callback_data: "phone" }],
+        [{ text: "⬅ Назад", callback_data: "back" }]
+      ]
+    }
+  });
 });
 
-/* ================= CITY ================= */
-
-bot.action("CITY", async (ctx) => {
+bot.action("lang", async (ctx) => {
   await ctx.answerCbQuery();
-
-  await sendClean(
-    ctx,
-    text.ru.chooseCity,
-    Markup.inlineKeyboard([
-      ...cities.map((c) => [Markup.button.callback(c, `CITY_${c}`)]),
-      [Markup.button.callback(text.ru.back, "SETTINGS")]
-    ])
-  );
+  await safeEdit(ctx, t(ctx.from.id).chooseLang, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Русский 🇷🇺", callback_data: "set_ru" }],
+        [{ text: "O'zbek 🇺🇿", callback_data: "set_uz" }],
+        [{ text: "English 🇬🇧", callback_data: "set_en" }],
+        [{ text: t(ctx.from.id).back, callback_data: "back" }]
+      ]
+    }
+  });
 });
 
-bot.action(/CITY_(.+)/, async (ctx) => {
-  const city = ctx.match[1];
-  const user = getUser(ctx.from.id);
-  user.city = city;
-
-  await ctx.answerCbQuery("Город обновлён");
-  await sendClean(ctx, `✅ Город изменён на ${city}`, mainMenu(user.lang));
-});
-
-/* ================= LANGUAGE ================= */
-
-bot.action(/LANG_(.+)/, async (ctx) => {
-  const newLang = ctx.match[1];
-  const user = getUser(ctx.from.id);
-  user.lang = newLang;
-
+bot.action(/set_(.+)/, async (ctx) => {
+  const lang = ctx.match[1];
+  users[ctx.from.id].lang = lang;
   await ctx.answerCbQuery("Language updated");
-  await sendClean(ctx, text[newLang].welcome, mainMenu(newLang));
+  await ctx.reply(t(ctx.from.id).welcome, {
+    parse_mode: "Markdown",
+    ...mainMenu()
+  });
 });
 
-/* ================= OTHER ================= */
-
-bot.action("ABOUT", async (ctx) => {
-  const user = getUser(ctx.from.id);
+bot.action("phone", async (ctx) => {
+  awaitingPhone.add(ctx.from.id);
   await ctx.answerCbQuery();
-  await sendClean(ctx, text[user.lang].aboutText);
+  await ctx.reply(t(ctx.from.id).enterPhone);
 });
 
-bot.action("HELP", async (ctx) => {
-  const user = getUser(ctx.from.id);
+bot.action("back", async (ctx) => {
   await ctx.answerCbQuery();
-  await sendClean(ctx, text[user.lang].helpText);
+  await ctx.reply(t(ctx.from.id).welcome, {
+    parse_mode: "Markdown",
+    ...mainMenu()
+  });
 });
 
-bot.action("ORDERS", async (ctx) => {
-  await ctx.answerCbQuery();
-  await sendClean(ctx, text.ru.comingSoon);
+/* ================= TEXT HANDLER ================= */
+
+bot.on("text", async (ctx) => {
+  const id = ctx.from.id;
+
+  /* Review */
+  if (awaitingReview.has(id)) {
+    awaitingReview.delete(id);
+
+    const reviewText = ctx.message.text;
+
+    await bot.telegram.sendMessage(
+      SUPPORT_CHAT_ID,
+      `📝 Новый отзыв\n\n👤 ${ctx.from.first_name}\n🆔 ${id}\n\n${reviewText}`
+    );
+
+    await ctx.reply(t(id).reviewThanks);
+    return;
+  }
+
+  /* Phone */
+  if (awaitingPhone.has(id)) {
+    if (!ctx.message.text.startsWith("+998")) {
+      await ctx.reply("Введите номер в формате +998...");
+      return;
+    }
+    awaitingPhone.delete(id);
+    users[id].phone = ctx.message.text;
+    await ctx.reply("✅ Номер сохранён");
+  }
 });
 
-bot.action("BALANCE", async (ctx) => {
-  await ctx.answerCbQuery();
-  await sendClean(ctx, "💰 0 UZS");
-});
-
-bot.action("REVIEW", async (ctx) => {
-  await ctx.answerCbQuery();
-  await sendClean(ctx, "⭐ Отправьте отзыв следующим сообщением.");
-});
-
-bot.action("BACK", async (ctx) => {
-  const user = getUser(ctx.from.id);
-  await ctx.answerCbQuery();
-  await sendClean(ctx, text[user.lang].welcome, mainMenu(user.lang));
-});
-
-/* ================= WEBHOOK ================= */
+/* ================= VERCEL HANDLER ================= */
 
 export default async function handler(req, res) {
-  try {
-    await bot.handleUpdate(req.body);
-    res.status(200).send("OK");
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Error");
+  if (req.method === "POST") {
+    try {
+      await bot.handleUpdate(req.body);
+      res.status(200).json({ ok: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Bot error" });
+    }
+  } else {
+    res.status(200).send("Bot running");
   }
 }
