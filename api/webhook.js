@@ -2,10 +2,9 @@ import { Telegraf, Markup } from "telegraf";
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-// 👉 ID вашей группы (бот админ)
 const SUPPORT_GROUP_ID = -1003714441392;
+const WEB_APP_URL = "https://test-version-omega.vercel.app/";
 
-// Простое хранилище (для Vercel достаточно)
 const users = {};
 
 /* ===========================
@@ -31,7 +30,7 @@ const texts = {
 2️⃣ Выберите ресторан  
 3️⃣ Оформите заказ  
 
-Если возникнут вопросы — напишите в поддержку:
+Поддержка:
 📩 @CampusEats`,
 
     about: `ℹ️ О нас
@@ -39,17 +38,15 @@ const texts = {
 CampusEats — современная платформа доставки еды.
 
 Наша цель — сделать заказ быстрым,
-удобным и понятным для каждого пользователя.`,
+удобным и понятным.`,
 
     balance: `💰 Ваш баланс: 0 UZS`,
-    orders: `📦 История заказов появится после запуска полной версии сервиса.`,
+    orders: `📦 История заказов станет доступна после запуска полной версии.`,
     reviewAsk: `✍️ Напишите ваш отзыв одним сообщением.`,
     reviewThanks: `🙏 Спасибо за ваш отзыв!
 
-Ваше мнение помогает нам становиться лучше.
-Мы ценим каждого пользователя 💛`,
+Ваше мнение помогает нам становиться лучше 💛`,
 
-    settings: `⚙️ Настройки`,
     chooseLang: `🌍 Выберите язык:`,
   },
 
@@ -61,45 +58,43 @@ Welcome to CampusEats 🍽
 We are a modern food delivery service.
 
 🎓 Students receive bonuses.
-🍔 Anyone can order food quickly and easily.
+🍔 Anyone can order food easily.
 
 Choose an option below 👇`,
 
     help: `🆘 Help
 
 1️⃣ Click Order  
-2️⃣ Choose a restaurant  
-3️⃣ Place your order  
+2️⃣ Choose restaurant  
+3️⃣ Place order  
 
-Need support?
+Support:
 📩 @CampusEats`,
 
     about: `ℹ️ About Us
 
-CampusEats is a modern food delivery platform.
+CampusEats is a modern delivery platform.
 
-Our mission is to make ordering food
-simple and convenient.`,
+Our mission is to make food ordering simple and fast.`,
 
     balance: `💰 Your balance: 0 UZS`,
     orders: `📦 Order history will be available soon.`,
     reviewAsk: `✍️ Please send your review in one message.`,
-    reviewThanks: `🙏 Thank you for your review!
+    reviewThanks: `🙏 Thank you for your feedback!
 
-Your feedback helps us improve 💛`,
+We truly appreciate it 💛`,
 
-    settings: `⚙️ Settings`,
     chooseLang: `🌍 Choose language:`,
   }
 };
 
 /* ===========================
-   📌 Главное меню
+   📌 Главное меню (INLINE)
 =========================== */
 
 function mainMenu(lang = "ru") {
   return Markup.inlineKeyboard([
-    [Markup.button.callback("📦 Order", "order")],
+    [Markup.button.webApp("📦 Order", WEB_APP_URL)],
     [Markup.button.callback("📦 Мои заказы", "orders")],
     [Markup.button.callback("💰 Balance", "balance")],
     [Markup.button.callback("⭐ Оставить отзыв", "review")],
@@ -119,7 +114,7 @@ bot.start(async (ctx) => {
   if (!users[id]) {
     users[id] = {
       lang: "ru",
-      username: ctx.from.username || "не указан",
+      username: ctx.from.username || null,
       name: ctx.from.first_name || "",
       phone: null,
       reviewMode: false
@@ -127,17 +122,7 @@ bot.start(async (ctx) => {
   }
 
   const lang = users[id].lang;
-
   await ctx.reply(texts[lang].welcome, mainMenu(lang));
-});
-
-/* ===========================
-   📦 Order
-=========================== */
-
-bot.action("order", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.reply("🚀 Раздел заказов скоро будет доступен.");
 });
 
 /* ===========================
@@ -200,10 +185,9 @@ bot.on("text", async (ctx) => {
 
   if (!user || !user.reviewMode) return;
 
-  const reviewText = ctx.message.text;
-
   user.reviewMode = false;
 
+  const reviewText = ctx.message.text;
   const username = user.username ? `@${user.username}` : "не указан";
   const phone = user.phone || "не указан";
 
@@ -220,7 +204,6 @@ ${reviewText}`
   );
 
   const lang = user.lang || "ru";
-
   await ctx.reply(texts[lang].reviewThanks);
 });
 
@@ -230,7 +213,6 @@ ${reviewText}`
 
 bot.action("settings", async (ctx) => {
   await ctx.answerCbQuery();
-
   const lang = users[ctx.from.id]?.lang || "ru";
 
   await ctx.reply(
