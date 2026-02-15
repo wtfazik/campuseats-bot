@@ -1,34 +1,120 @@
-import { Telegraf } from "telegraf";
+const { Telegraf, Markup } = require("telegraf");
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  throw new Error("TELEGRAM_BOT_TOKEN is not defined");
+}
 
-// Команда /start
-bot.start((ctx) => {
-  return ctx.reply("Welcome to CampusEats 🍔", {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "Open App",
-            web_app: { url: process.env.WEBAPP_URL }
-          }
-        ]
-      ]
-    }
-  });
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+
+/* ===========================
+   START COMMAND
+=========================== */
+
+bot.start(async (ctx) => {
+  const firstName = ctx.from?.first_name || "Гость";
+
+  await ctx.replyWithMarkdown(
+    `👋 *Здравствуйте, ${firstName}!*
+
+Добро пожаловать в *Campus Eats* 🍽
+
+Мы — современный сервис доставки еды для студентов и кампусов.
+
+━━━━━━━━━━━━━━
+🚀 *Что вы можете сделать:*
+
+• Просмотреть доступные рестораны  
+• Оформить заказ за несколько кликов  
+• Отслеживать статус доставки  
+• Получать бонусы и кэшбек  
+
+━━━━━━━━━━━━━━
+
+Если возникнут вопросы — наша поддержка всегда на связи:
+📩 *Support:* @CampusEats
+
+Выберите действие ниже 👇`,
+    Markup.keyboard([
+      ["🍽 Меню ресторанов"],
+      ["📦 Мои заказы", "💰 Баланс"],
+      ["ℹ️ Помощь"]
+    ])
+      .resize()
+      .persistent()
+  );
 });
 
-// Экспортируем serverless handler
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(200).send("Bot is running");
-  }
+/* ===========================
+   HELP
+=========================== */
 
+bot.help(async (ctx) => {
+  await ctx.replyWithMarkdown(
+    `ℹ️ *Campus Eats — Помощь*
+
+Доступные команды:
+
+/start — Главное меню  
+/help — Помощь  
+
+Если у вас возникли технические вопросы или проблемы с заказом:
+
+📩 Support: @CampusEats`
+  );
+});
+
+/* ===========================
+   MENU BUTTONS HANDLER
+=========================== */
+
+bot.hears("🍽 Меню ресторанов", async (ctx) => {
+  await ctx.reply(
+    "Раздел ресторанов скоро будет доступен в полной версии 🚀"
+  );
+});
+
+bot.hears("📦 Мои заказы", async (ctx) => {
+  await ctx.reply(
+    "История заказов будет отображаться здесь после интеграции с backend."
+  );
+});
+
+bot.hears("💰 Баланс", async (ctx) => {
+  await ctx.reply(
+    "Раздел баланса и бонусной системы находится в разработке."
+  );
+});
+
+bot.hears("ℹ️ Помощь", async (ctx) => {
+  await ctx.reply(
+    "Для связи с поддержкой напишите: @CampusEats"
+  );
+});
+
+/* ===========================
+   FALLBACK
+=========================== */
+
+bot.on("text", async (ctx) => {
+  await ctx.reply(
+    "Пожалуйста, выберите действие из меню ниже 👇"
+  );
+});
+
+/* ===========================
+   VERCEL HANDLER
+=========================== */
+
+module.exports = async (req, res) => {
   try {
+    if (req.method !== "POST") {
+      return res.status(200).send("OK");
+    }
+
     await bot.handleUpdate(req.body);
     return res.status(200).send("OK");
   } catch (error) {
-    console.error(error);
-    return res.status(500).send("Error");
+    console.error("Webhook error:", error);
+    return res.status(500).send("Internal Server Error");
   }
-}
+};
