@@ -4,7 +4,8 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 const WEBAPP_URL = "https://test-version-omega.vercel.app/";
 const SUPPORT_CHAT_ID = "-1003714441392";
-const API_URL = "https://campuseats-api-h1g5.onrender.com/api/reviews"; // URL твоего бэкенда
+// Используем переменную окружения или адрес по умолчанию
+const BACKEND_URL = process.env.BACKEND_URL || "https://campuseats-api-h1g5.onrender.com";
 
 // Хранилище данных (защита от сброса на Vercel через проверки)
 const userState = {};
@@ -174,14 +175,38 @@ const languageKeyboard = Markup.inlineKeyboard([
 bot.start(async (ctx) => {
   try {
     userState[ctx.from.id] = null;
+    
+    // 1. Очистка старой клавиатуры
     try {
         const loadingMsg = await ctx.reply("...", Markup.removeKeyboard());
         await ctx.deleteMessage(loadingMsg.message_id);
     } catch(e) {}
 
+    // 2. СИНХРОНИЗАЦИЯ С BACKEND (РЕГИСТРАЦИЯ ЮЗЕРА)
+    try {
+      await fetch(`${BACKEND_URL}/api/telegram/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          telegram_id: ctx.from.id,
+          username: ctx.from.username || null,
+          first_name: ctx.from.first_name || null,
+          last_name: ctx.from.last_name || null,
+          language: userData[ctx.from.id]?.lang || "ru" // Отправляем текущий язык или RU по умолчанию
+        })
+      });
+      console.log(`✅ User ${ctx.from.id} synced with backend.`);
+    } catch (err) {
+      console.error("❌ Telegram sync error:", err);
+    }
+
+    // 3. Логика интерфейса (Язык -> Меню)
     if (!userData[ctx.from.id]?.lang) {
       return await ctx.reply("🇷🇺 Выберите язык / 🇺🇿 Tilni tanlang / 🇬🇧 Choose language", languageKeyboard);
     }
+    
     await ctx.replyWithMarkdown(getTxt(ctx, "start_text"), mainMenu(ctx));
   } catch (e) {
     console.error("Start Error:", e);
@@ -328,7 +353,7 @@ bot.action("review", async (ctx) => {
   } catch (e) { console.log(e); }
 });
 
-// ===== ОБРАБОТКА ТЕКСТА (С ИНТЕГРАЦИЕЙ BACKEND) =====
+// ===== ОБРАБОТКА ТЕКСТА =====
 bot.on("text", async (ctx) => {
   try {
     const state = userState[ctx.from.id];
@@ -359,7 +384,7 @@ bot.on("text", async (ctx) => {
 
       // --- ШАГ 1: ОТПРАВКА В BACKEND (PostgreSQL) ---
       try {
-        const response = await fetch(API_URL, {
+        const response = await fetch(`${BACKEND_URL}/api/reviews`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -375,11 +400,10 @@ bot.on("text", async (ctx) => {
         if (response.ok) {
           console.log("✅ Отзыв сохранен в БД");
         } else {
-          console.error("⚠️ Ошибка сохранения в БД:", await response.text());
+          console.error("⚠️ Ошибка сохранения отзыва:", await response.text());
         }
       } catch (dbError) {
         console.error("❌ API Error:", dbError);
-        // Не прерываем работу, чтобы отправить сообщение в Telegram
       }
 
       // --- ШАГ 2: ОТПРАВКА В ГРУППУ ПОДДЕРЖКИ ---
@@ -392,7 +416,6 @@ ${reviewText}`;
 
       await ctx.telegram.sendMessage(SUPPORT_CHAT_ID, adminMsg);
 
-      // Сброс состояния и ответ пользователю
       userState[ctx.from.id] = null;
       return ctx.reply(getTxt(ctx, "review_thanks"), mainMenu(ctx));
     }
