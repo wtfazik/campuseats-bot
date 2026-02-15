@@ -5,11 +5,12 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 const WEBAPP_URL = "https://test-version-omega.vercel.app/";
 const SUPPORT_CHAT_ID = "-1003714441392";
 
-// Хранилище данных (в памяти)
+// Хранилище данных (Внимание: на Vercel оно сбрасывается при перезагрузке,
+// поэтому добавлена защита от сбоев)
 const userState = {};
 const userData = {};
 
-// ===== СПИСОК ГОРОДОВ (Конфигурация) =====
+// ===== СПИСОК ГОРОДОВ =====
 const CITIES = [
   { code: "tashkent", label: "Toshkent / Ташкент" },
   { code: "samarkand", label: "Samarqand / Самарканд" },
@@ -27,7 +28,7 @@ const CITIES = [
   { code: "kokand", label: "Qo'qon / Коканд" },
 ];
 
-// ===== СЛОВАРЬ (TEXTS) =====
+// ===== ТЕКСТЫ =====
 const textStore = {
   ru: {
     btn_order: "🍽 Заказать еду",
@@ -127,13 +128,25 @@ const textStore = {
   }
 };
 
-// Хелпер для получения текста
-const getTxt = (ctx, key) => {
-  const lang = userData[ctx.from.id]?.lang || "ru"; 
-  return textStore[lang][key] || textStore["ru"][key];
+// ===== БЕЗОПАСНЫЕ ФУНКЦИИ (Fix Crashing) =====
+
+// Безопасное получение языка
+const getLang = (ctx) => {
+  if (!ctx.from) return "ru";
+  const id = ctx.from.id;
+  // Если память очистилась, создаем заново
+  if (!userData[id]) userData[id] = {};
+  return userData[id].lang || "ru";
 };
 
-// ===== ГЛАВНОЕ МЕНЮ (Функция) =====
+// Безопасное получение текста
+const getTxt = (ctx, key) => {
+  const lang = getLang(ctx);
+  const dict = textStore[lang] || textStore["ru"];
+  return dict[key] || textStore["ru"][key] || "Text Error";
+};
+
+// Функция генерации главного меню
 function mainMenu(ctx) {
   const t = (k) => getTxt(ctx, k);
   
@@ -152,49 +165,65 @@ function mainMenu(ctx) {
   ]);
 }
 
-// ===== КЛАВИАТУРА ВЫБОРА ЯЗЫКА =====
+// Клавиатура языков
 const languageKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback("🇷🇺 Русский", "lang_ru")],
   [Markup.button.callback("🇺🇿 O'zbekcha", "lang_uz")],
   [Markup.button.callback("🇬🇧 English", "lang_en")],
 ]);
 
-// ===== /start =====
+// ===== ОБРАБОТЧИКИ (HANDLERS) =====
+
+// /start
 bot.start(async (ctx) => {
-  userState[ctx.from.id] = null;
-  
-  // 1. Чистим старые кнопки
-  const loadingMsg = await ctx.reply("...", Markup.removeKeyboard());
-  try { await ctx.deleteMessage(loadingMsg.message_id); } catch(e){}
-
-  // 2. Если новый юзер — выбор языка
-  if (!userData[ctx.from.id]?.lang) {
-    return ctx.reply("🇷🇺 Выберите язык / 🇺🇿 Tilni tanlang / 🇬🇧 Choose language", languageKeyboard);
-  }
-
-  // 3. Иначе — меню
-  await ctx.replyWithMarkdown(getTxt(ctx, "start_text"), mainMenu(ctx));
-});
-
-// ===== ЯЗЫК (Обработка) =====
-bot.action(/lang_(.+)/, async (ctx) => {
-  const newLang = ctx.match[1];
-  
-  if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
-  userData[ctx.from.id].lang = newLang;
-
-  await ctx.answerCbQuery();
-  // Показываем меню на новом языке
-  await ctx.editMessageText(
-    textStore[newLang].start_text, 
-    { parse_mode: "Markdown", ...mainMenu(ctx) }
-  );
-});
-
-// ===== НАВИГАЦИЯ =====
-bot.action("back", async (ctx) => {
-  await ctx.answerCbQuery();
   try {
+    userState[ctx.from.id] = null;
+    
+    // Удаляем клавиатуру (игнорируем ошибку, если ее нет)
+    try {
+        const loadingMsg = await ctx.reply("...", Markup.removeKeyboard());
+        await ctx.deleteMessage(loadingMsg.message_id);
+    } catch(e) {}
+
+    // Если нет языка — просим выбрать
+    if (!userData[ctx.from.id]?.lang) {
+      return await ctx.reply("🇷🇺 Выберите язык / 🇺🇿 Tilni tanlang / 🇬🇧 Choose language", languageKeyboard);
+    }
+
+    await ctx.replyWithMarkdown(getTxt(ctx, "start_text"), mainMenu(ctx));
+  } catch (e) {
+    console.error("Start Error:", e);
+  }
+});
+
+// СМЕНА ЯЗЫКА (ИСПРАВЛЕНО: Явный список вместо Regex, чтобы не было ошибок)
+bot.action(["lang_ru", "lang_uz", "lang_en"], async (ctx) => {
+  try {
+    const newLang = ctx.match[0].replace("lang_", ""); // ru, uz, en
+    
+    if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
+    userData[ctx.from.id].lang = newLang;
+
+    await ctx.answerCbQuery();
+    
+    // Показываем меню на НОВОМ языке
+    // Используем textStore напрямую, чтобы гарантированно взять текст нового языка
+    const newText = textStore[newLang].start_text || textStore["ru"].start_text;
+    
+    await ctx.editMessageText(newText, { 
+      parse_mode: "Markdown", 
+      ...mainMenu(ctx) 
+    });
+  } catch (e) {
+    console.error("Lang Error:", e);
+    await ctx.answerCbQuery("Error changing language / Ошибка смены языка");
+  }
+});
+
+// НАВИГАЦИЯ И КНОПКИ
+bot.action("back", async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
     await ctx.editMessageText(getTxt(ctx, "start_text"), {
       parse_mode: "Markdown",
       ...mainMenu(ctx)
@@ -202,163 +231,166 @@ bot.action("back", async (ctx) => {
   } catch (e) {}
 });
 
-// Простые разделы
-bot.action("orders", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(getTxt(ctx, "my_orders_text"), { parse_mode: "Markdown", ...mainMenu(ctx) });
+// Разделы меню
+const simplePages = [
+    { action: "orders", textKey: "my_orders_text" },
+    { action: "balance", textKey: "balance_text" },
+    { action: "about", textKey: "about_text" },
+    { action: "help", textKey: "help_text" }
+];
+
+simplePages.forEach(page => {
+    bot.action(page.action, async (ctx) => {
+        try {
+            await ctx.answerCbQuery();
+            await ctx.editMessageText(getTxt(ctx, page.textKey), { 
+                parse_mode: "Markdown", 
+                ...mainMenu(ctx) 
+            });
+        } catch (e) { console.log(e); }
+    });
 });
 
-bot.action("balance", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(getTxt(ctx, "balance_text"), { parse_mode: "Markdown", ...mainMenu(ctx) });
-});
-
-bot.action("about", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(getTxt(ctx, "about_text"), { parse_mode: "Markdown", ...mainMenu(ctx) });
-});
-
-bot.action("help", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(getTxt(ctx, "help_text"), { parse_mode: "Markdown", ...mainMenu(ctx) });
-});
-
-// ===== НАСТРОЙКИ (КРАСИВО) =====
+// НАСТРОЙКИ
 bot.action("settings", async (ctx) => {
-  await ctx.answerCbQuery();
-  const t = (k) => getTxt(ctx, k);
+  try {
+    await ctx.answerCbQuery();
+    const t = (k) => getTxt(ctx, k);
 
-  await ctx.editMessageText(
-    t("settings_title"),
-    {
-      parse_mode: "Markdown",
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback(t("btn_change_lang"), "change_lang_menu")],
-        [Markup.button.callback(t("btn_change_city"), "set_city")],
-        [Markup.button.callback(t("btn_change_phone"), "set_phone")],
-        [Markup.button.callback(t("btn_back"), "back")]
-      ])
-    }
-  );
+    await ctx.editMessageText(
+      t("settings_title"),
+      {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(t("btn_change_lang"), "change_lang_menu")],
+          [Markup.button.callback(t("btn_change_city"), "set_city")],
+          [Markup.button.callback(t("btn_change_phone"), "set_phone")],
+          [Markup.button.callback(t("btn_back"), "back")]
+        ])
+      }
+    );
+  } catch (e) { console.log(e); }
 });
 
 bot.action("change_lang_menu", async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(textStore.ru.lang_select, languageKeyboard);
+  try {
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(textStore.ru.lang_select, languageKeyboard);
+  } catch (e) { console.log(e); }
 });
 
-// ===== ГОРОДА (12+ штук, 2 колонки) =====
+// ГОРОДА
 bot.action("set_city", async (ctx) => {
-  await ctx.answerCbQuery();
-  const t = (k) => getTxt(ctx, k);
-  
-  // Генерируем кнопки из массива CITIES (по 2 в ряд)
-  const cityButtons = [];
-  for (let i = 0; i < CITIES.length; i += 2) {
-    const row = [];
-    row.push(Markup.button.callback(CITIES[i].label, `city_${CITIES[i].code}`));
-    if (CITIES[i + 1]) {
-      row.push(Markup.button.callback(CITIES[i + 1].label, `city_${CITIES[i + 1].code}`));
+  try {
+    await ctx.answerCbQuery();
+    const t = (k) => getTxt(ctx, k);
+    
+    const cityButtons = [];
+    for (let i = 0; i < CITIES.length; i += 2) {
+      const row = [];
+      row.push(Markup.button.callback(CITIES[i].label, `city_${CITIES[i].code}`));
+      if (CITIES[i + 1]) {
+        row.push(Markup.button.callback(CITIES[i + 1].label, `city_${CITIES[i + 1].code}`));
+      }
+      cityButtons.push(row);
     }
-    cityButtons.push(row);
-  }
-  
-  // Добавляем кнопку "Назад" в конец
-  cityButtons.push([Markup.button.callback(t("btn_back"), "settings")]);
+    cityButtons.push([Markup.button.callback(t("btn_back"), "settings")]);
 
-  await ctx.editMessageText(
-    t("choose_city"),
-    {
-      parse_mode: "Markdown",
-      ...Markup.inlineKeyboard(cityButtons)
-    }
-  );
+    await ctx.editMessageText(t("choose_city"), {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard(cityButtons)
+    });
+  } catch (e) { console.log(e); }
 });
 
-// Обработка выбора города
 bot.action(/city_(.+)/, async (ctx) => {
-  const cityCode = ctx.match[1];
-  // Находим красивое название по коду
-  const cityObj = CITIES.find(c => c.code === cityCode);
-  const cityLabel = cityObj ? cityObj.label : cityCode;
-
-  if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
-  userData[ctx.from.id].city = cityCode;
-
-  await ctx.answerCbQuery();
-  await ctx.editMessageText(
-    `${getTxt(ctx, "city_saved")} *${cityLabel}*`,
-    {
-      parse_mode: "Markdown",
-      ...mainMenu(ctx)
-    }
-  );
-});
-
-// ===== ТЕЛЕФОН =====
-bot.action("set_phone", async (ctx) => {
-  userState[ctx.from.id] = "waiting_phone";
-  await ctx.answerCbQuery();
-  // Отправляем новое сообщение, так как пользователю нужно ввести текст
-  await ctx.replyWithMarkdown(getTxt(ctx, "enter_phone"));
-});
-
-// ===== ОТЗЫВ =====
-bot.action("review", async (ctx) => {
-  userState[ctx.from.id] = "waiting_review";
-  await ctx.answerCbQuery();
-  await ctx.replyWithMarkdown(getTxt(ctx, "enter_review"));
-});
-
-// ===== ЕДИНЫЙ ОБРАБОТЧИК ТЕКСТА (UPDATED) =====
-bot.on("text", async (ctx) => {
-  const state = userState[ctx.from.id];
-
-  // 1. Ввод телефона
-  if (state === "waiting_phone") {
-    const phone = ctx.message.text.trim();
-
-    if (!phone.startsWith("+998") || phone.length < 13) {
-      return ctx.reply(getTxt(ctx, "wrong_phone"));
-    }
+  try {
+    const cityCode = ctx.match[1];
+    const cityObj = CITIES.find(c => c.code === cityCode);
+    const cityLabel = cityObj ? cityObj.label : cityCode;
 
     if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
-    userData[ctx.from.id].phone = phone;
-    userState[ctx.from.id] = null;
+    userData[ctx.from.id].city = cityCode;
 
-    return ctx.reply(getTxt(ctx, "phone_saved"), mainMenu(ctx));
-  }
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(
+      `${getTxt(ctx, "city_saved")} *${cityLabel}*`,
+      {
+        parse_mode: "Markdown",
+        ...mainMenu(ctx)
+      }
+    );
+  } catch (e) { console.log(e); }
+});
 
-  // 2. Ввод отзыва (ТОЧНО ПО ШАБЛОНУ)
-  if (state === "waiting_review") {
-    const reviewText = ctx.message.text.trim();
-    
-    // Получаем Username
-    const username = ctx.from.username ? `@${ctx.from.username}` : "Не указан";
-    
-    // Получаем Телефон
-    const phone = userData[ctx.from.id]?.phone || "Не указан";
+// ТЕЛЕФОН
+bot.action("set_phone", async (ctx) => {
+  try {
+    userState[ctx.from.id] = "waiting_phone";
+    await ctx.answerCbQuery();
+    await ctx.replyWithMarkdown(getTxt(ctx, "enter_phone"));
+  } catch (e) { console.log(e); }
+});
 
-    // Формируем сообщение для админа
-    const adminMsg = 
+// ОТЗЫВ
+bot.action("review", async (ctx) => {
+  try {
+    userState[ctx.from.id] = "waiting_review";
+    await ctx.answerCbQuery();
+    await ctx.replyWithMarkdown(getTxt(ctx, "enter_review"));
+  } catch (e) { console.log(e); }
+});
+
+// ОБРАБОТКА ТЕКСТА
+bot.on("text", async (ctx) => {
+  try {
+    const state = userState[ctx.from.id];
+    if (!state) return; // Если состояния нет, игнорируем
+
+    // 1. Телефон
+    if (state === "waiting_phone") {
+      const phone = ctx.message.text.trim();
+
+      if (!phone.startsWith("+998") || phone.length < 13) {
+        return ctx.reply(getTxt(ctx, "wrong_phone"));
+      }
+
+      if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
+      userData[ctx.from.id].phone = phone;
+      userState[ctx.from.id] = null;
+
+      return ctx.reply(getTxt(ctx, "phone_saved"), mainMenu(ctx));
+    }
+
+    // 2. Отзыв
+    if (state === "waiting_review") {
+      const reviewText = ctx.message.text.trim();
+      
+      const username = ctx.from.username ? `@${ctx.from.username}` : "Не указан";
+      // Используем безопасный доступ (?.)
+      const phone = userData[ctx.from.id]?.phone || "Не указан";
+      const city = userData[ctx.from.id]?.city || "Не выбран";
+      const lang = userData[ctx.from.id]?.lang || "ru";
+
+      const adminMsg = 
 `Новый отзыв
 Username: ${username}
 Телефон: ${phone}
 Текст:
 ${reviewText}`;
 
-    // Отправляем в группу
-    await ctx.telegram.sendMessage(SUPPORT_CHAT_ID, adminMsg);
+      // Отправляем админу
+      await ctx.telegram.sendMessage(SUPPORT_CHAT_ID, adminMsg);
 
-    // Сбрасываем состояние
-    userState[ctx.from.id] = null;
-    
-    // Говорим спасибо юзеру
-    return ctx.reply(getTxt(ctx, "review_thanks"), mainMenu(ctx));
+      userState[ctx.from.id] = null;
+      return ctx.reply(getTxt(ctx, "review_thanks"), mainMenu(ctx));
+    }
+  } catch (e) {
+    console.error("Text Handler Error:", e);
   }
 });
 
-// ===== WEBHOOK =====
+// WEBHOOK
 module.exports = async (req, res) => {
   try {
     await bot.handleUpdate(req.body);
