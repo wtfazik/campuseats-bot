@@ -4,9 +4,9 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 const WEBAPP_URL = "https://test-version-omega.vercel.app/";
 const SUPPORT_CHAT_ID = "-1003714441392";
+const API_URL = "https://campuseats-api-h1g5.onrender.com/api/reviews"; // URL твоего бэкенда
 
-// Хранилище данных (Внимание: на Vercel оно сбрасывается при перезагрузке,
-// поэтому добавлена защита от сбоев)
+// Хранилище данных (защита от сброса на Vercel через проверки)
 const userState = {};
 const userData = {};
 
@@ -58,7 +58,7 @@ const textStore = {
     phone_saved: "✅ Номер телефона сохранен!",
     
     enter_review: "✍️ *Напишите ваш отзыв*\n\nМы внимательно читаем все сообщения.",
-    review_thanks: "Спасибо! Ваш отзыв отправлен команде. 🙌",
+    review_thanks: "Спасибо! Ваш отзыв отправлен команде и сохранен. 🙌",
     wrong_phone: "⚠️ Ошибка. Номер должен начинаться с +998",
     lang_select: "🇷🇺 Выберите язык интерфейса\n🇺🇿 Ilova tilini tanlang\n🇬🇧 Choose interface language"
   },
@@ -90,7 +90,7 @@ const textStore = {
     phone_saved: "✅ Telefon raqam saqlandi!",
     
     enter_review: "✍️ *Fikringizni yozib qoldiring*\n\nBiz har bir fikrni o'qiymiz.",
-    review_thanks: "Rahmat! Fikringiz jamoaga yuborildi. 🙌",
+    review_thanks: "Rahmat! Fikringiz jamoaga yuborildi va saqlandi. 🙌",
     wrong_phone: "⚠️ Xato. Raqam +998 bilan boshlanishi kerak",
     lang_select: "🇷🇺 Выберите язык интерфейса\n🇺🇿 Ilova tilini tanlang\n🇬🇧 Choose interface language"
   },
@@ -122,31 +122,28 @@ const textStore = {
     phone_saved: "✅ Phone number saved!",
     
     enter_review: "✍️ *Write your review*\n\nWe read every message.",
-    review_thanks: "Thanks! Your feedback has been sent. 🙌",
+    review_thanks: "Thanks! Your feedback has been sent and saved. 🙌",
     wrong_phone: "⚠️ Error. Number must start with +998",
     lang_select: "🇷🇺 Выберите язык интерфейса\n🇺🇿 Ilova tilini tanlang\n🇬🇧 Choose interface language"
   }
 };
 
-// ===== БЕЗОПАСНЫЕ ФУНКЦИИ (Fix Crashing) =====
+// ===== БЕЗОПАСНЫЕ ФУНКЦИИ (Helpers) =====
 
-// Безопасное получение языка
 const getLang = (ctx) => {
   if (!ctx.from) return "ru";
   const id = ctx.from.id;
-  // Если память очистилась, создаем заново
   if (!userData[id]) userData[id] = {};
   return userData[id].lang || "ru";
 };
 
-// Безопасное получение текста
 const getTxt = (ctx, key) => {
   const lang = getLang(ctx);
   const dict = textStore[lang] || textStore["ru"];
   return dict[key] || textStore["ru"][key] || "Text Error";
 };
 
-// Функция генерации главного меню
+// Главное меню
 function mainMenu(ctx) {
   const t = (k) => getTxt(ctx, k);
   
@@ -165,7 +162,6 @@ function mainMenu(ctx) {
   ]);
 }
 
-// Клавиатура языков
 const languageKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback("🇷🇺 Русский", "lang_ru")],
   [Markup.button.callback("🇺🇿 O'zbekcha", "lang_uz")],
@@ -178,36 +174,29 @@ const languageKeyboard = Markup.inlineKeyboard([
 bot.start(async (ctx) => {
   try {
     userState[ctx.from.id] = null;
-    
-    // Удаляем клавиатуру (игнорируем ошибку, если ее нет)
     try {
         const loadingMsg = await ctx.reply("...", Markup.removeKeyboard());
         await ctx.deleteMessage(loadingMsg.message_id);
     } catch(e) {}
 
-    // Если нет языка — просим выбрать
     if (!userData[ctx.from.id]?.lang) {
       return await ctx.reply("🇷🇺 Выберите язык / 🇺🇿 Tilni tanlang / 🇬🇧 Choose language", languageKeyboard);
     }
-
     await ctx.replyWithMarkdown(getTxt(ctx, "start_text"), mainMenu(ctx));
   } catch (e) {
     console.error("Start Error:", e);
   }
 });
 
-// СМЕНА ЯЗЫКА (ИСПРАВЛЕНО: Явный список вместо Regex, чтобы не было ошибок)
+// СМЕНА ЯЗЫКА
 bot.action(["lang_ru", "lang_uz", "lang_en"], async (ctx) => {
   try {
-    const newLang = ctx.match[0].replace("lang_", ""); // ru, uz, en
+    const newLang = ctx.match[0].replace("lang_", "");
     
     if (!userData[ctx.from.id]) userData[ctx.from.id] = {};
     userData[ctx.from.id].lang = newLang;
 
     await ctx.answerCbQuery();
-    
-    // Показываем меню на НОВОМ языке
-    // Используем textStore напрямую, чтобы гарантированно взять текст нового языка
     const newText = textStore[newLang].start_text || textStore["ru"].start_text;
     
     await ctx.editMessageText(newText, { 
@@ -216,11 +205,10 @@ bot.action(["lang_ru", "lang_uz", "lang_en"], async (ctx) => {
     });
   } catch (e) {
     console.error("Lang Error:", e);
-    await ctx.answerCbQuery("Error changing language / Ошибка смены языка");
   }
 });
 
-// НАВИГАЦИЯ И КНОПКИ
+// НАВИГАЦИЯ
 bot.action("back", async (ctx) => {
   try {
     await ctx.answerCbQuery();
@@ -231,7 +219,6 @@ bot.action("back", async (ctx) => {
   } catch (e) {}
 });
 
-// Разделы меню
 const simplePages = [
     { action: "orders", textKey: "my_orders_text" },
     { action: "balance", textKey: "balance_text" },
@@ -332,7 +319,7 @@ bot.action("set_phone", async (ctx) => {
   } catch (e) { console.log(e); }
 });
 
-// ОТЗЫВ
+// КНОПКА ОТЗЫВ
 bot.action("review", async (ctx) => {
   try {
     userState[ctx.from.id] = "waiting_review";
@@ -341,13 +328,13 @@ bot.action("review", async (ctx) => {
   } catch (e) { console.log(e); }
 });
 
-// ОБРАБОТКА ТЕКСТА
+// ===== ОБРАБОТКА ТЕКСТА (С ИНТЕГРАЦИЕЙ BACKEND) =====
 bot.on("text", async (ctx) => {
   try {
     const state = userState[ctx.from.id];
-    if (!state) return; // Если состояния нет, игнорируем
+    if (!state) return;
 
-    // 1. Телефон
+    // 1. Сохранение Телефона
     if (state === "waiting_phone") {
       const phone = ctx.message.text.trim();
 
@@ -362,16 +349,40 @@ bot.on("text", async (ctx) => {
       return ctx.reply(getTxt(ctx, "phone_saved"), mainMenu(ctx));
     }
 
-    // 2. Отзыв
+    // 2. ОТПРАВКА ОТЗЫВА В БД И ГРУППУ
     if (state === "waiting_review") {
       const reviewText = ctx.message.text.trim();
       
       const username = ctx.from.username ? `@${ctx.from.username}` : "Не указан";
-      // Используем безопасный доступ (?.)
       const phone = userData[ctx.from.id]?.phone || "Не указан";
       const city = userData[ctx.from.id]?.city || "Не выбран";
-      const lang = userData[ctx.from.id]?.lang || "ru";
 
+      // --- ШАГ 1: ОТПРАВКА В BACKEND (PostgreSQL) ---
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            telegram_id: ctx.from.id,
+            username: username,
+            phone: phone,
+            message: reviewText
+          })
+        });
+
+        if (response.ok) {
+          console.log("✅ Отзыв сохранен в БД");
+        } else {
+          console.error("⚠️ Ошибка сохранения в БД:", await response.text());
+        }
+      } catch (dbError) {
+        console.error("❌ API Error:", dbError);
+        // Не прерываем работу, чтобы отправить сообщение в Telegram
+      }
+
+      // --- ШАГ 2: ОТПРАВКА В ГРУППУ ПОДДЕРЖКИ ---
       const adminMsg = 
 `Новый отзыв
 Username: ${username}
@@ -379,9 +390,9 @@ Username: ${username}
 Текст:
 ${reviewText}`;
 
-      // Отправляем админу
       await ctx.telegram.sendMessage(SUPPORT_CHAT_ID, adminMsg);
 
+      // Сброс состояния и ответ пользователю
       userState[ctx.from.id] = null;
       return ctx.reply(getTxt(ctx, "review_thanks"), mainMenu(ctx));
     }
