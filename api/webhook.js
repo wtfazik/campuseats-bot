@@ -1,261 +1,210 @@
-import { Telegraf, Markup } from "telegraf";
+const { Telegraf, Markup } = require("telegraf");
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-const SUPPORT_GROUP_ID = -1003714441392;
-const WEB_APP_URL = "https://test-version-omega.vercel.app/";
+// ====== CONFIG ======
+const WEBAPP_URL = "https://test-version-omega.vercel.app/";
+const SUPPORT_CHAT_ID = "-1003714441392"; // ваша группа
+// =====================
 
-const users = {};
+const userState = {};
 
-/* ===========================
-   🌍 Тексты
-=========================== */
+// ====== ГЛАВНОЕ МЕНЮ ======
+function mainMenu() {
+  return Markup.inlineKeyboard([
+    [Markup.button.webApp("🍽 Меню ресторанов", WEBAPP_URL)],
+    [
+      Markup.button.callback("📦 Мои заказы", "orders"),
+      Markup.button.callback("💰 Баланс", "balance"),
+    ],
+    [Markup.button.callback("⭐ Оставить отзыв", "review")],
+    [Markup.button.callback("ℹ️ О нас", "about")],
+    [Markup.button.callback("⚙️ Настройки", "settings")],
+    [Markup.button.callback("🆘 Помощь", "help")],
+  ]);
+}
 
-const texts = {
-  ru: {
-    welcome: `👋 Здравствуйте!
+// ====== /start ======
+bot.start(async (ctx) => {
+  await ctx.reply(
+`👋 Здравствуйте!
 
 Добро пожаловать в CampusEats 🍽
 
 Мы — современный сервис доставки еды.
 
 🎓 Студенты получают бонусы.
-🍔 Любой пользователь может заказать еду быстро и удобно.
+Вы можете заказывать еду быстро и удобно.
 
 Выберите действие ниже 👇`,
-
-    help: `🆘 Помощь
-
-1️⃣ Нажмите Order  
-2️⃣ Выберите ресторан  
-3️⃣ Оформите заказ  
-
-Поддержка:
-📩 @CampusEats`,
-
-    about: `ℹ️ О нас
-
-CampusEats — современная платформа доставки еды.
-
-Наша цель — сделать заказ быстрым,
-удобным и понятным.`,
-
-    balance: `💰 Ваш баланс: 0 UZS`,
-    orders: `📦 История заказов станет доступна после запуска полной версии.`,
-    reviewAsk: `✍️ Напишите ваш отзыв одним сообщением.`,
-    reviewThanks: `🙏 Спасибо за ваш отзыв!
-
-Ваше мнение помогает нам становиться лучше 💛`,
-
-    chooseLang: `🌍 Выберите язык:`,
-  },
-
-  en: {
-    welcome: `👋 Hello!
-
-Welcome to CampusEats 🍽
-
-We are a modern food delivery service.
-
-🎓 Students receive bonuses.
-🍔 Anyone can order food easily.
-
-Choose an option below 👇`,
-
-    help: `🆘 Help
-
-1️⃣ Click Order  
-2️⃣ Choose restaurant  
-3️⃣ Place order  
-
-Support:
-📩 @CampusEats`,
-
-    about: `ℹ️ About Us
-
-CampusEats is a modern delivery platform.
-
-Our mission is to make food ordering simple and fast.`,
-
-    balance: `💰 Your balance: 0 UZS`,
-    orders: `📦 Order history will be available soon.`,
-    reviewAsk: `✍️ Please send your review in one message.`,
-    reviewThanks: `🙏 Thank you for your feedback!
-
-We truly appreciate it 💛`,
-
-    chooseLang: `🌍 Choose language:`,
-  }
-};
-
-/* ===========================
-   📌 Главное меню (INLINE)
-=========================== */
-
-function mainMenu(lang = "ru") {
-  return Markup.inlineKeyboard([
-    [Markup.button.webApp("📦 Order", WEB_APP_URL)],
-    [Markup.button.callback("📦 Мои заказы", "orders")],
-    [Markup.button.callback("💰 Balance", "balance")],
-    [Markup.button.callback("⭐ Оставить отзыв", "review")],
-    [Markup.button.callback("ℹ️ О нас", "about")],
-    [Markup.button.callback("⚙️ Настройки", "settings")],
-    [Markup.button.callback("🆘 Помощь", "help")]
-  ]);
-}
-
-/* ===========================
-   🚀 START
-=========================== */
-
-bot.start(async (ctx) => {
-  const id = ctx.from.id;
-
-  if (!users[id]) {
-    users[id] = {
-      lang: "ru",
-      username: ctx.from.username || null,
-      name: ctx.from.first_name || "",
-      phone: null,
-      reviewMode: false
-    };
-  }
-
-  const lang = users[id].lang;
-  await ctx.reply(texts[lang].welcome, mainMenu(lang));
+    mainMenu()
+  );
 });
 
-/* ===========================
-   📦 Orders
-=========================== */
-
+// ====== Мои заказы ======
 bot.action("orders", async (ctx) => {
   await ctx.answerCbQuery();
-  const lang = users[ctx.from.id]?.lang || "ru";
-  await ctx.reply(texts[lang].orders);
+  await ctx.editMessageText(
+`📦 Мои заказы
+
+Здесь будет отображаться ваша история заказов.
+
+Раздел станет доступен после полной интеграции.`,
+    mainMenu()
+  );
 });
 
-/* ===========================
-   💰 Balance
-=========================== */
-
+// ====== Баланс ======
 bot.action("balance", async (ctx) => {
   await ctx.answerCbQuery();
-  const lang = users[ctx.from.id]?.lang || "ru";
-  await ctx.reply(texts[lang].balance);
+  await ctx.editMessageText(
+`💰 Ваш баланс: 0 UZS
+
+Бонусная система находится в разработке.`,
+    mainMenu()
+  );
 });
 
-/* ===========================
-   ℹ️ About
-=========================== */
-
+// ====== О НАС ======
 bot.action("about", async (ctx) => {
   await ctx.answerCbQuery();
-  const lang = users[ctx.from.id]?.lang || "ru";
-  await ctx.reply(texts[lang].about);
+  await ctx.editMessageText(
+`ℹ️ О нас
+
+CampusEats — сервис доставки еды.
+
+Мы делаем заказ еды быстрым и удобным.
+
+Поддержка: @CampusEats`,
+    mainMenu()
+  );
 });
 
-/* ===========================
-   🆘 Help
-=========================== */
-
+// ====== ПОМОЩЬ ======
 bot.action("help", async (ctx) => {
   await ctx.answerCbQuery();
-  const lang = users[ctx.from.id]?.lang || "ru";
-  await ctx.reply(texts[lang].help);
-});
+  await ctx.editMessageText(
+`🆘 Помощь
 
-/* ===========================
-   ⭐ Review
-=========================== */
+1️⃣ Нажмите «Меню ресторанов»
+2️⃣ Выберите ресторан
+3️⃣ Оформите заказ
 
-bot.action("review", async (ctx) => {
-  await ctx.answerCbQuery();
-  const id = ctx.from.id;
-  const lang = users[id]?.lang || "ru";
-
-  users[id].reviewMode = true;
-
-  await ctx.reply(texts[lang].reviewAsk);
-});
-
-bot.on("text", async (ctx) => {
-  const id = ctx.from.id;
-  const user = users[id];
-
-  if (!user || !user.reviewMode) return;
-
-  user.reviewMode = false;
-
-  const reviewText = ctx.message.text;
-  const username = user.username ? `@${user.username}` : "не указан";
-  const phone = user.phone || "не указан";
-
-  await bot.telegram.sendMessage(
-    SUPPORT_GROUP_ID,
-    `📩 Новый отзыв
-
-👤 Имя: ${user.name}
-🔗 Username: ${username}
-📞 Телефон: ${phone}
-
-📝 Отзыв:
-${reviewText}`
+Если возникнут вопросы:
+@CampusEats`,
+    mainMenu()
   );
-
-  const lang = user.lang || "ru";
-  await ctx.reply(texts[lang].reviewThanks);
 });
 
-/* ===========================
-   ⚙️ Settings
-=========================== */
-
+// ====== НАСТРОЙКИ ======
 bot.action("settings", async (ctx) => {
   await ctx.answerCbQuery();
-  const lang = users[ctx.from.id]?.lang || "ru";
+  await ctx.editMessageText(
+`⚙️ Настройки
 
-  await ctx.reply(
-    texts[lang].chooseLang,
+Выберите действие:`,
     Markup.inlineKeyboard([
-      [
-        Markup.button.callback("🇷🇺 Русский", "lang_ru"),
-        Markup.button.callback("🇬🇧 English", "lang_en")
-      ]
+      [Markup.button.callback("📞 Указать телефон", "set_phone")],
+      [Markup.button.callback("🏙 Указать город", "set_city")],
+      [Markup.button.callback("🔙 Назад", "back")]
     ])
   );
 });
 
-/* ===========================
-   🌍 Language
-=========================== */
-
-bot.action("lang_ru", async (ctx) => {
-  users[ctx.from.id].lang = "ru";
-  await ctx.answerCbQuery("Язык изменен");
-  await ctx.reply(texts.ru.welcome, mainMenu("ru"));
+bot.action("back", async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+`Главное меню 👇`,
+    mainMenu()
+  );
 });
 
-bot.action("lang_en", async (ctx) => {
-  users[ctx.from.id].lang = "en";
-  await ctx.answerCbQuery("Language updated");
-  await ctx.reply(texts.en.welcome, mainMenu("en"));
+// ====== ГОРОДА ======
+bot.action("set_city", async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+`🏙 Выберите город:`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback("Ташкент", "city_tashkent")],
+      [Markup.button.callback("Самарканд", "city_samarkand")],
+      [Markup.button.callback("Бухара", "city_bukhara")],
+      [Markup.button.callback("Андижан", "city_andijan")],
+      [Markup.button.callback("🔙 Назад", "settings")]
+    ])
+  );
 });
 
-/* ===========================
-   🌐 Webhook
-=========================== */
+bot.action(/city_(.+)/, async (ctx) => {
+  const city = ctx.match[1];
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+`✅ Город выбран: ${city}`,
+    mainMenu()
+  );
+});
 
-export default async function handler(req, res) {
-  if (req.method === "POST") {
-    try {
-      await bot.handleUpdate(req.body);
-      res.status(200).end();
-    } catch (error) {
-      console.error(error);
-      res.status(500).end();
+// ====== ТЕЛЕФОН ======
+bot.action("set_phone", async (ctx) => {
+  userState[ctx.from.id] = "waiting_phone";
+  await ctx.answerCbQuery();
+  await ctx.reply("Введите номер телефона (формат: +998XXXXXXXXX)");
+});
+
+bot.on("text", async (ctx) => {
+  if (userState[ctx.from.id] === "waiting_phone") {
+    const phone = ctx.message.text;
+
+    if (!phone.startsWith("+998")) {
+      return ctx.reply("Номер должен начинаться с +998");
     }
-  } else {
-    res.status(200).send("Bot is running");
+
+    userState[ctx.from.id] = null;
+    await ctx.reply("✅ Телефон сохранён");
   }
-}
+});
+
+// ====== ОТЗЫВ ======
+bot.action("review", async (ctx) => {
+  userState[ctx.from.id] = "waiting_review";
+  await ctx.answerCbQuery();
+  await ctx.reply("✍️ Напишите ваш отзыв:");
+});
+
+bot.on("text", async (ctx) => {
+  if (userState[ctx.from.id] === "waiting_review") {
+
+    const reviewText = ctx.message.text;
+
+    const username = ctx.from.username
+      ? `@${ctx.from.username}`
+      : "Нет username";
+
+    const phone = "Не указан";
+
+    await ctx.telegram.sendMessage(
+      SUPPORT_CHAT_ID,
+`📝 Новый отзыв
+
+👤 Пользователь: ${username}
+📞 Телефон: ${phone}
+
+💬 Сообщение:
+${reviewText}`
+    );
+
+    userState[ctx.from.id] = null;
+
+    await ctx.reply("Спасибо за ваш отзыв! Это помогает нам становиться лучше 🙌", mainMenu());
+  }
+});
+
+// ====== WEBHOOK ======
+module.exports = async (req, res) => {
+  try {
+    await bot.handleUpdate(req.body);
+    res.status(200).end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
+  }
+};
