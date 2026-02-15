@@ -2,12 +2,57 @@ import { Telegraf, Markup } from "telegraf";
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-/* ================== STORAGE (временно) ================== */
+/* ================= STORAGE ================= */
+
 const users = {};
 
-/* ================== TRANSLATIONS ================== */
+/* ================= CITIES ================= */
 
-const t = {
+const cities = [
+  "Tashkent",
+  "Samarkand",
+  "Bukhara",
+  "Andijan",
+  "Namangan",
+  "Fergana",
+  "Nukus",
+  "Khiva",
+  "Termez",
+  "Karshi",
+  "Jizzakh",
+  "Navoi",
+  "Gulistan"
+];
+
+/* ================= HELPERS ================= */
+
+function getUser(id) {
+  if (!users[id]) {
+    users[id] = {
+      lang: "ru",
+      city: "Tashkent",
+      lastMessageId: null
+    };
+  }
+  return users[id];
+}
+
+async function sendClean(ctx, text, keyboard = null) {
+  const user = getUser(ctx.from.id);
+
+  if (user.lastMessageId) {
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat.id, user.lastMessageId);
+    } catch {}
+  }
+
+  const msg = await ctx.reply(text, keyboard);
+  user.lastMessageId = msg.message_id;
+}
+
+/* ================= TRANSLATIONS ================= */
+
+const text = {
   ru: {
     welcome: `👋 Здравствуйте!
 
@@ -27,12 +72,9 @@ const t = {
     settings: "⚙️ Настройки",
     help: "🆘 Помощь",
     back: "⬅️ Назад",
-
-    aboutText: `ℹ️ О CampusEats
-
-CampusEats — сервис доставки еды.
-Мы делаем заказ быстрым и удобным.`,
-
+    chooseLang: "🌍 Выберите язык:",
+    chooseCity: "🏙 Выберите город:",
+    currentCity: (city) => `🏙 Ваш город: ${city}`,
     helpText: `🆘 Помощь
 
 1️⃣ Нажмите Order
@@ -40,174 +82,134 @@ CampusEats — сервис доставки еды.
 3️⃣ Оформите заказ
 
 Support: @CampusEats`,
+    aboutText: `ℹ️ О CampusEats
 
-    chooseLang: "🌍 Выберите язык:",
-    phoneAsk: "Введите номер телефона (+998XXXXXXXXX)",
-    cityAsk: "🏙 Выберите ваш город:"
-  },
-
-  uz: {
-    welcome: `👋 Assalomu alaykum!
-
-CampusEats'ga xush kelibsiz 🍽
-
-Biz — zamonaviy ovqat yetkazib berish xizmati.
-
-🎓 Talabalar uchun bonuslar mavjud.
-
-Quyidagilardan birini tanlang 👇`,
-
-    order: "📦 Buyurtma",
-    orders: "📦 Buyurtmalarim",
-    balance: "💰 Balans",
-    review: "⭐ Fikr qoldirish",
-    about: "ℹ️ Biz haqimizda",
-    settings: "⚙️ Sozlamalar",
-    help: "🆘 Yordam",
-    back: "⬅️ Orqaga",
-
-    aboutText: `ℹ️ CampusEats haqida
-
-CampusEats — ovqat yetkazib berish xizmati.
-Buyurtma berish jarayonini osonlashtiramiz.`,
-
-    helpText: `🆘 Yordam
-
-1️⃣ Buyurtma tugmasini bosing
-2️⃣ Restoran tanlang
-3️⃣ Buyurtmani tasdiqlang
-
-Support: @CampusEats`,
-
-    chooseLang: "🌍 Tilni tanlang:",
-    phoneAsk: "+998 formatida telefon kiriting",
-    cityAsk: "🏙 Shaharni tanlang:"
-  },
-
-  en: {
-    welcome: `👋 Hello!
-
-Welcome to CampusEats 🍽
-
-We are a modern food delivery service.
-
-🎓 Students receive bonuses.
-
-Choose an option below 👇`,
-
-    order: "📦 Order",
-    orders: "📦 My Orders",
-    balance: "💰 Balance",
-    review: "⭐ Leave Review",
-    about: "ℹ️ About",
-    settings: "⚙️ Settings",
-    help: "🆘 Help",
-    back: "⬅️ Back",
-
-    aboutText: `ℹ️ About CampusEats
-
-CampusEats is a food delivery service.
-We make ordering simple and fast.`,
-
-    helpText: `🆘 Help
-
-1️⃣ Click Order
-2️⃣ Choose restaurant
-3️⃣ Confirm order
-
-Support: @CampusEats`,
-
-    chooseLang: "🌍 Choose language:",
-    phoneAsk: "Enter phone number (+998XXXXXXXXX)",
-    cityAsk: "🏙 Choose your city:"
+CampusEats — сервис доставки еды.
+Мы делаем заказ быстрым и удобным.`,
+    comingSoon: "🚀 Функция скоро будет доступна."
   }
 };
 
-/* ================== HELPER ================== */
-
-function getLang(id) {
-  return users[id]?.lang || "ru";
-}
+/* ================= MAIN MENU ================= */
 
 function mainMenu(lang) {
   return Markup.inlineKeyboard([
-    [Markup.button.webApp(t[lang].order, "https://test-version-omega.vercel.app/")],
-    [Markup.button.callback(t[lang].orders, "ORDERS")],
-    [Markup.button.callback(t[lang].balance, "BALANCE")],
-    [Markup.button.callback(t[lang].review, "REVIEW")],
-    [Markup.button.callback(t[lang].about, "ABOUT")],
-    [Markup.button.callback(t[lang].settings, "SETTINGS")],
-    [Markup.button.callback(t[lang].help, "HELP")]
+    [Markup.button.webApp(text[lang].order, "https://test-version-omega.vercel.app/")],
+    [Markup.button.callback(text[lang].orders, "ORDERS")],
+    [Markup.button.callback(text[lang].balance, "BALANCE")],
+    [Markup.button.callback(text[lang].review, "REVIEW")],
+    [Markup.button.callback(text[lang].about, "ABOUT")],
+    [Markup.button.callback(text[lang].settings, "SETTINGS")],
+    [Markup.button.callback(text[lang].help, "HELP")]
   ]);
 }
 
-/* ================== START ================== */
+/* ================= START ================= */
 
 bot.start(async (ctx) => {
-  const lang = getLang(ctx.from.id);
-  await ctx.reply(t[lang].welcome, mainMenu(lang));
+  const user = getUser(ctx.from.id);
+  await sendClean(ctx, text[user.lang].welcome, mainMenu(user.lang));
 });
 
-/* ================== LANGUAGE ================== */
+/* ================= /ALL COMMAND ================= */
+
+bot.command("all", async (ctx) => {
+  const user = getUser(ctx.from.id);
+  await sendClean(ctx, text[user.lang].welcome, mainMenu(user.lang));
+});
+
+/* ================= SETTINGS ================= */
 
 bot.action("SETTINGS", async (ctx) => {
-  const lang = getLang(ctx.from.id);
+  const user = getUser(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.reply(
-    t[lang].chooseLang,
+
+  await sendClean(
+    ctx,
+    `${text[user.lang].currentCity(user.city)}
+
+${text[user.lang].chooseLang}`,
     Markup.inlineKeyboard([
       [Markup.button.callback("Русский 🇷🇺", "LANG_ru")],
       [Markup.button.callback("O‘zbek 🇺🇿", "LANG_uz")],
       [Markup.button.callback("English 🇬🇧", "LANG_en")],
-      [Markup.button.callback(t[lang].back, "BACK")]
+      [Markup.button.callback("🏙 Сменить город", "CITY")],
+      [Markup.button.callback(text[user.lang].back, "BACK")]
     ])
   );
 });
 
-bot.action(/LANG_(.+)/, async (ctx) => {
-  const newLang = ctx.match[1];
-  users[ctx.from.id] = { ...users[ctx.from.id], lang: newLang };
-  await ctx.answerCbQuery("Language updated");
-  await ctx.reply(t[newLang].welcome, mainMenu(newLang));
+/* ================= CITY ================= */
+
+bot.action("CITY", async (ctx) => {
+  await ctx.answerCbQuery();
+
+  await sendClean(
+    ctx,
+    text.ru.chooseCity,
+    Markup.inlineKeyboard([
+      ...cities.map((c) => [Markup.button.callback(c, `CITY_${c}`)]),
+      [Markup.button.callback(text.ru.back, "SETTINGS")]
+    ])
+  );
 });
 
-/* ================== OTHER BUTTONS ================== */
+bot.action(/CITY_(.+)/, async (ctx) => {
+  const city = ctx.match[1];
+  const user = getUser(ctx.from.id);
+  user.city = city;
+
+  await ctx.answerCbQuery("Город обновлён");
+  await sendClean(ctx, `✅ Город изменён на ${city}`, mainMenu(user.lang));
+});
+
+/* ================= LANGUAGE ================= */
+
+bot.action(/LANG_(.+)/, async (ctx) => {
+  const newLang = ctx.match[1];
+  const user = getUser(ctx.from.id);
+  user.lang = newLang;
+
+  await ctx.answerCbQuery("Language updated");
+  await sendClean(ctx, text[newLang].welcome, mainMenu(newLang));
+});
+
+/* ================= OTHER ================= */
 
 bot.action("ABOUT", async (ctx) => {
-  const lang = getLang(ctx.from.id);
+  const user = getUser(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.reply(t[lang].aboutText);
+  await sendClean(ctx, text[user.lang].aboutText);
 });
 
 bot.action("HELP", async (ctx) => {
-  const lang = getLang(ctx.from.id);
+  const user = getUser(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.reply(t[lang].helpText);
+  await sendClean(ctx, text[user.lang].helpText);
 });
 
 bot.action("ORDERS", async (ctx) => {
-  const lang = getLang(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.reply("🚀 This feature will be available soon.");
+  await sendClean(ctx, text.ru.comingSoon);
 });
 
 bot.action("BALANCE", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply("💰 0 UZS");
+  await sendClean(ctx, "💰 0 UZS");
 });
 
 bot.action("REVIEW", async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply("⭐ Please send your review as a message.");
+  await sendClean(ctx, "⭐ Отправьте отзыв следующим сообщением.");
 });
 
 bot.action("BACK", async (ctx) => {
-  const lang = getLang(ctx.from.id);
+  const user = getUser(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.reply(t[lang].welcome, mainMenu(lang));
+  await sendClean(ctx, text[user.lang].welcome, mainMenu(user.lang));
 });
 
-/* ================== WEBHOOK ================== */
+/* ================= WEBHOOK ================= */
 
 export default async function handler(req, res) {
   try {
