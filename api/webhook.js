@@ -1,120 +1,220 @@
-const { Telegraf, Markup } = require("telegraf");
-
-if (!process.env.TELEGRAM_BOT_TOKEN) {
-  throw new Error("TELEGRAM_BOT_TOKEN is not defined");
-}
+import { Telegraf, Markup } from "telegraf";
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-/* ===========================
-   START COMMAND
-=========================== */
+/* ================== STORAGE (временно) ================== */
+const users = {};
 
-bot.start(async (ctx) => {
-  const firstName = ctx.from?.first_name || "Гость";
+/* ================== TRANSLATIONS ================== */
 
-  await ctx.replyWithMarkdown(
-    `👋 *Здравствуйте, ${firstName}!*
+const t = {
+  ru: {
+    welcome: `👋 Здравствуйте!
 
-Добро пожаловать в *Campus Eats* 🍽
+Добро пожаловать в CampusEats 🍽
 
-Мы — современный сервис доставки еды для студентов и кампусов.
+Мы — современный сервис доставки еды.
 
-━━━━━━━━━━━━━━
-🚀 *Что вы можете сделать:*
-
-• Просмотреть доступные рестораны  
-• Оформить заказ за несколько кликов  
-• Отслеживать статус доставки  
-• Получать бонусы и кэшбек  
-
-━━━━━━━━━━━━━━
-
-Если возникнут вопросы — наша поддержка всегда на связи:
-📩 *Support:* @CampusEats
+🎓 Студенты получают бонусы.
 
 Выберите действие ниже 👇`,
-    Markup.keyboard([
-      ["🍽 Меню ресторанов"],
-      ["📦 Мои заказы", "💰 Баланс"],
-      ["ℹ️ Помощь"]
-    ])
-      .resize()
-      .persistent()
-  );
-});
 
-/* ===========================
-   HELP
-=========================== */
+    order: "📦 Order",
+    orders: "📦 Мои заказы",
+    balance: "💰 Balance",
+    review: "⭐ Оставить отзыв",
+    about: "ℹ️ О нас",
+    settings: "⚙️ Настройки",
+    help: "🆘 Помощь",
+    back: "⬅️ Назад",
 
-bot.help(async (ctx) => {
-  await ctx.replyWithMarkdown(
-    `ℹ️ *Campus Eats — Помощь*
+    aboutText: `ℹ️ О CampusEats
 
-Доступные команды:
+CampusEats — сервис доставки еды.
+Мы делаем заказ быстрым и удобным.`,
 
-/start — Главное меню  
-/help — Помощь  
+    helpText: `🆘 Помощь
 
-Если у вас возникли технические вопросы или проблемы с заказом:
+1️⃣ Нажмите Order
+2️⃣ Выберите ресторан
+3️⃣ Оформите заказ
 
-📩 Support: @CampusEats`
-  );
-});
+Support: @CampusEats`,
 
-/* ===========================
-   MENU BUTTONS HANDLER
-=========================== */
+    chooseLang: "🌍 Выберите язык:",
+    phoneAsk: "Введите номер телефона (+998XXXXXXXXX)",
+    cityAsk: "🏙 Выберите ваш город:"
+  },
 
-bot.hears("🍽 Меню ресторанов", async (ctx) => {
-  await ctx.reply(
-    "Раздел ресторанов скоро будет доступен в полной версии 🚀"
-  );
-});
+  uz: {
+    welcome: `👋 Assalomu alaykum!
 
-bot.hears("📦 Мои заказы", async (ctx) => {
-  await ctx.reply(
-    "История заказов будет отображаться здесь после интеграции с backend."
-  );
-});
+CampusEats'ga xush kelibsiz 🍽
 
-bot.hears("💰 Баланс", async (ctx) => {
-  await ctx.reply(
-    "Раздел баланса и бонусной системы находится в разработке."
-  );
-});
+Biz — zamonaviy ovqat yetkazib berish xizmati.
 
-bot.hears("ℹ️ Помощь", async (ctx) => {
-  await ctx.reply(
-    "Для связи с поддержкой напишите: @CampusEats"
-  );
-});
+🎓 Talabalar uchun bonuslar mavjud.
 
-/* ===========================
-   FALLBACK
-=========================== */
+Quyidagilardan birini tanlang 👇`,
 
-bot.on("text", async (ctx) => {
-  await ctx.reply(
-    "Пожалуйста, выберите действие из меню ниже 👇"
-  );
-});
+    order: "📦 Buyurtma",
+    orders: "📦 Buyurtmalarim",
+    balance: "💰 Balans",
+    review: "⭐ Fikr qoldirish",
+    about: "ℹ️ Biz haqimizda",
+    settings: "⚙️ Sozlamalar",
+    help: "🆘 Yordam",
+    back: "⬅️ Orqaga",
 
-/* ===========================
-   VERCEL HANDLER
-=========================== */
+    aboutText: `ℹ️ CampusEats haqida
 
-module.exports = async (req, res) => {
-  try {
-    if (req.method !== "POST") {
-      return res.status(200).send("OK");
-    }
+CampusEats — ovqat yetkazib berish xizmati.
+Buyurtma berish jarayonini osonlashtiramiz.`,
 
-    await bot.handleUpdate(req.body);
-    return res.status(200).send("OK");
-  } catch (error) {
-    console.error("Webhook error:", error);
-    return res.status(500).send("Internal Server Error");
+    helpText: `🆘 Yordam
+
+1️⃣ Buyurtma tugmasini bosing
+2️⃣ Restoran tanlang
+3️⃣ Buyurtmani tasdiqlang
+
+Support: @CampusEats`,
+
+    chooseLang: "🌍 Tilni tanlang:",
+    phoneAsk: "+998 formatida telefon kiriting",
+    cityAsk: "🏙 Shaharni tanlang:"
+  },
+
+  en: {
+    welcome: `👋 Hello!
+
+Welcome to CampusEats 🍽
+
+We are a modern food delivery service.
+
+🎓 Students receive bonuses.
+
+Choose an option below 👇`,
+
+    order: "📦 Order",
+    orders: "📦 My Orders",
+    balance: "💰 Balance",
+    review: "⭐ Leave Review",
+    about: "ℹ️ About",
+    settings: "⚙️ Settings",
+    help: "🆘 Help",
+    back: "⬅️ Back",
+
+    aboutText: `ℹ️ About CampusEats
+
+CampusEats is a food delivery service.
+We make ordering simple and fast.`,
+
+    helpText: `🆘 Help
+
+1️⃣ Click Order
+2️⃣ Choose restaurant
+3️⃣ Confirm order
+
+Support: @CampusEats`,
+
+    chooseLang: "🌍 Choose language:",
+    phoneAsk: "Enter phone number (+998XXXXXXXXX)",
+    cityAsk: "🏙 Choose your city:"
   }
 };
+
+/* ================== HELPER ================== */
+
+function getLang(id) {
+  return users[id]?.lang || "ru";
+}
+
+function mainMenu(lang) {
+  return Markup.inlineKeyboard([
+    [Markup.button.webApp(t[lang].order, "https://test-version-omega.vercel.app/")],
+    [Markup.button.callback(t[lang].orders, "ORDERS")],
+    [Markup.button.callback(t[lang].balance, "BALANCE")],
+    [Markup.button.callback(t[lang].review, "REVIEW")],
+    [Markup.button.callback(t[lang].about, "ABOUT")],
+    [Markup.button.callback(t[lang].settings, "SETTINGS")],
+    [Markup.button.callback(t[lang].help, "HELP")]
+  ]);
+}
+
+/* ================== START ================== */
+
+bot.start(async (ctx) => {
+  const lang = getLang(ctx.from.id);
+  await ctx.reply(t[lang].welcome, mainMenu(lang));
+});
+
+/* ================== LANGUAGE ================== */
+
+bot.action("SETTINGS", async (ctx) => {
+  const lang = getLang(ctx.from.id);
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    t[lang].chooseLang,
+    Markup.inlineKeyboard([
+      [Markup.button.callback("Русский 🇷🇺", "LANG_ru")],
+      [Markup.button.callback("O‘zbek 🇺🇿", "LANG_uz")],
+      [Markup.button.callback("English 🇬🇧", "LANG_en")],
+      [Markup.button.callback(t[lang].back, "BACK")]
+    ])
+  );
+});
+
+bot.action(/LANG_(.+)/, async (ctx) => {
+  const newLang = ctx.match[1];
+  users[ctx.from.id] = { ...users[ctx.from.id], lang: newLang };
+  await ctx.answerCbQuery("Language updated");
+  await ctx.reply(t[newLang].welcome, mainMenu(newLang));
+});
+
+/* ================== OTHER BUTTONS ================== */
+
+bot.action("ABOUT", async (ctx) => {
+  const lang = getLang(ctx.from.id);
+  await ctx.answerCbQuery();
+  await ctx.reply(t[lang].aboutText);
+});
+
+bot.action("HELP", async (ctx) => {
+  const lang = getLang(ctx.from.id);
+  await ctx.answerCbQuery();
+  await ctx.reply(t[lang].helpText);
+});
+
+bot.action("ORDERS", async (ctx) => {
+  const lang = getLang(ctx.from.id);
+  await ctx.answerCbQuery();
+  await ctx.reply("🚀 This feature will be available soon.");
+});
+
+bot.action("BALANCE", async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.reply("💰 0 UZS");
+});
+
+bot.action("REVIEW", async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.reply("⭐ Please send your review as a message.");
+});
+
+bot.action("BACK", async (ctx) => {
+  const lang = getLang(ctx.from.id);
+  await ctx.answerCbQuery();
+  await ctx.reply(t[lang].welcome, mainMenu(lang));
+});
+
+/* ================== WEBHOOK ================== */
+
+export default async function handler(req, res) {
+  try {
+    await bot.handleUpdate(req.body);
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error");
+  }
+}
