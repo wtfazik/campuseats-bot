@@ -38,14 +38,12 @@ const textStore = {
     btn_settings: "⚙️ Настройки",
     btn_help: "🆘 Помощь",
     
-    // Настройки
     settings_title: "⚙️ *Настройки профиля*\n\nЗдесь вы можете изменить свои данные и параметры бота.",
     btn_change_lang: "🌐 Сменить язык",
     btn_change_phone: "📞 Сменить номер",
     btn_change_city: "🏙 Сменить город",
     btn_back: "🔙 Назад",
 
-    // Остальное
     start_text: "👋 *Добро пожаловать в CampusEats!* 🍽\n\nМы доставляем вкусную еду прямо к вам.\n🎓 Студентам — специальные бонусы.\n\nВыберите действие в меню ниже 👇",
     my_orders_text: "📦 *История заказов*\n\nВаш список пуст или раздел находится в разработке.",
     balance_text: "💰 *Ваш баланс*: 0 UZS\n\nБонусная программа скоро запустится.",
@@ -312,7 +310,7 @@ bot.action("review", async (ctx) => {
   await ctx.replyWithMarkdown(getTxt(ctx, "enter_review"));
 });
 
-// ===== ЕДИНЫЙ ОБРАБОТЧИК ТЕКСТА =====
+// ===== ЕДИНЫЙ ОБРАБОТЧИК ТЕКСТА (UPDATED) =====
 bot.on("text", async (ctx) => {
   const state = userState[ctx.from.id];
 
@@ -331,30 +329,31 @@ bot.on("text", async (ctx) => {
     return ctx.reply(getTxt(ctx, "phone_saved"), mainMenu(ctx));
   }
 
-  // 2. Ввод отзыва
+  // 2. Ввод отзыва (ТОЧНО ПО ШАБЛОНУ)
   if (state === "waiting_review") {
     const reviewText = ctx.message.text.trim();
-    const username = ctx.from.username ? `@${ctx.from.username}` : "No username";
+    
+    // Получаем Username
+    const username = ctx.from.username ? `@${ctx.from.username}` : "Не указан";
+    
+    // Получаем Телефон
     const phone = userData[ctx.from.id]?.phone || "Не указан";
-    const lang = userData[ctx.from.id]?.lang || "ru";
-    const city = userData[ctx.from.id]?.city || "Не выбран";
 
-    // Админу приходит полная инфа
-    await ctx.telegram.sendMessage(
-      SUPPORT_CHAT_ID,
-`📝 *НОВЫЙ ОТЗЫВ*
-➖➖➖➖➖➖➖
-👤 *User:* ${username}
-📞 *Phone:* ${phone}
-🏙 *City:* ${city}
-🌐 *Lang:* ${lang}
-➖➖➖➖➖➖➖
-💬 *Сообщение:*
-${reviewText}`,
-      { parse_mode: "Markdown" }
-    );
+    // Формируем сообщение для админа
+    const adminMsg = 
+`Новый отзыв
+Username: ${username}
+Телефон: ${phone}
+Текст:
+${reviewText}`;
 
+    // Отправляем в группу
+    await ctx.telegram.sendMessage(SUPPORT_CHAT_ID, adminMsg);
+
+    // Сбрасываем состояние
     userState[ctx.from.id] = null;
+    
+    // Говорим спасибо юзеру
     return ctx.reply(getTxt(ctx, "review_thanks"), mainMenu(ctx));
   }
 });
